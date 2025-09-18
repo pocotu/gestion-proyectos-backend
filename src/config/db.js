@@ -11,9 +11,10 @@ const pool = mysql.createPool({
   database: config.DB_NAME,
   connectionLimit: config.DB_CONNECTION_LIMIT,
   queueLimit: config.DB_QUEUE_LIMIT,
-  acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true
+  // Removed invalid options for MySQL2:
+  // - acquireTimeout (not supported in mysql2)
+  // - timeout (not supported in mysql2) 
+  // - reconnect (not supported in mysql2)
 });
 
 // Test database connection
