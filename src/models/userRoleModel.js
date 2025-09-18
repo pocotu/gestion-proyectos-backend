@@ -42,9 +42,9 @@ class UserRoleModel {
 
   static async getUserRoles(usuario_id) {
     const sql = `
-      SELECT ur.*, r.nombre as rol_nombre 
+      SELECT ur.*, user_role_model_table.nombre as rol_nombre 
       FROM usuario_roles ur
-      JOIN roles r ON ur.rol_id = r.id
+      JOIN roles user_role_model_table ON ur.rol_id = user_role_model_table.id
       WHERE ur.usuario_id = ? AND ur.activo = TRUE
     `;
     const [rows] = await pool.execute(sql, [usuario_id]);
@@ -62,15 +62,40 @@ class UserRoleModel {
     return rows;
   }
 
-  static async hasRole(usuario_id, rol_nombre) {
-    const sql = `
+  static async findByUserId(userId) {
+    const query = `
+      SELECT ur.*, role_check_model_table.nombre as rol_nombre
+      FROM usuario_roles ur
+      LEFT JOIN roles role_check_model_table ON ur.rol_id = role_check_model_table.id
+      WHERE ur.usuario_id = ?
+    `;
+    
+    const [result] = await pool.execute(query, [userId]);
+    return result;
+  }
+
+  static async findByRoleId(roleId) {
+    const query = `
+      SELECT ur.*, u.nombre, u.email
+      FROM usuario_roles ur
+      LEFT JOIN usuarios u ON ur.usuario_id = u.id
+      WHERE ur.rol_id = ?
+    `;
+    
+    const [result] = await pool.execute(query, [roleId]);
+    return result;
+  }
+
+  static async hasRole(userId, roleName) {
+    const query = `
       SELECT COUNT(*) as count
       FROM usuario_roles ur
-      JOIN roles r ON ur.rol_id = r.id
-      WHERE ur.usuario_id = ? AND r.nombre = ? AND ur.activo = TRUE
+      LEFT JOIN roles role_check_model_table ON ur.rol_id = role_check_model_table.id
+      WHERE ur.usuario_id = ? AND role_check_model_table.nombre = ?
     `;
-    const [rows] = await pool.execute(sql, [usuario_id, rol_nombre]);
-    return rows[0].count > 0;
+    
+    const [result] = await pool.execute(query, [userId, roleName]);
+    return result[0].count > 0;
   }
 }
 

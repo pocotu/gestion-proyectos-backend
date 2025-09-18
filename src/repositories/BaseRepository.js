@@ -37,7 +37,20 @@ class BaseRepository {
    * SELECT clause
    */
   select(fields = '*') {
-    this.selectFields = Array.isArray(fields) ? fields.join(', ') : fields;
+    // Asegurar que fields sea un string válido
+    if (typeof fields === 'object' && fields !== null) {
+      console.error('Error: select() recibió un objeto en lugar de string:', fields);
+      fields = '*';
+    }
+    this.selectFields = Array.isArray(fields) ? fields.join(', ') : String(fields);
+    return this;
+  }
+
+  /**
+   * FROM clause with optional alias
+   */
+  from(tableWithAlias) {
+    this.tableName = tableWithAlias;
     return this;
   }
 
@@ -226,7 +239,9 @@ class BaseRepository {
    * Cuenta los registros
    */
   async count(field = '*') {
-    this.select(`COUNT(${field}) as total`);
+    // Validar que field sea un string válido
+    const validField = typeof field === 'string' && field.trim() ? field.trim() : '*';
+    this.select(`COUNT(${validField}) as total`);
     const result = await this.first();
     return result ? result.total : 0;
   }
@@ -293,6 +308,15 @@ class BaseRepository {
     return {
       affectedRows: result.affectedRows
     };
+  }
+
+  /**
+   * Busca un registro por ID
+   */
+  async findById(id) {
+    const query = `SELECT * FROM ${this.tableName} WHERE id = ? LIMIT 1`;
+    const [rows] = await pool.execute(query, [id]);
+    return rows[0] || null;
   }
 
   /**

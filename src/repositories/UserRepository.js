@@ -53,6 +53,58 @@ class UserRepository extends BaseRepository {
   }
 
   /**
+   * Obtiene todos los usuarios con filtros opcionales
+   */
+  async findAll(options = {}) {
+    try {
+      console.log('UserRepository.findAll - Iniciando con opciones:', options);
+      
+      // Usar query SQL directa por ahora para diagnosticar
+      const { pool } = require('../config/db');
+      const [rows] = await pool.execute('SELECT * FROM usuarios ORDER BY created_at DESC LIMIT 10');
+      
+      console.log('UserRepository.findAll - Usuarios encontrados:', rows.length);
+      return rows;
+    } catch (error) {
+      console.error('Error en UserRepository.findAll:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cuenta usuarios con filtros opcionales
+   */
+  async count(filters = {}) {
+    try {
+      this.reset(); // Asegurar que el query builder esté limpio
+      
+      let query = this.select('COUNT(*) as total');
+
+      // Aplicar filtros
+      if (filters.estado) {
+        query = query.where('estado', filters.estado);
+      }
+
+      if (filters.es_administrador !== undefined) {
+        query = query.where('es_administrador', filters.es_administrador);
+      }
+
+      if (filters.search) {
+        query = query.where(function() {
+          this.whereLike('nombre', `%${filters.search}%`)
+              .orWhereLike('email', `%${filters.search}%`);
+        });
+      }
+
+      const result = await query.first();
+      return result.total;
+    } catch (error) {
+      console.error('Error en UserRepository.count:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Busca usuarios por nombre (búsqueda parcial)
    */
   async findByName(name) {
@@ -246,18 +298,40 @@ class UserRepository extends BaseRepository {
    * Busca usuarios con sus roles (usando JOIN)
    */
   async findWithRoles(userId = null) {
-    let query = this
-      .select('usuarios.*, GROUP_CONCAT(roles.nombre) as roles')
-      .leftJoin('usuario_roles', 'usuarios.id', 'usuario_roles.usuario_id')
-      .leftJoin('roles', 'usuario_roles.rol_id', 'roles.id')
-      .groupBy('usuarios.id');
-
+    // Resetear el query builder para evitar conflictos
+    this.reset();
+    
+    // Usar query SQL directa para evitar conflictos de alias
+    const { pool } = require('../config/db');
+    
     if (userId) {
-      query = query.where('usuarios.id', userId);
-      return await query.first();
+      const query = `
+        SELECT 
+          u.*, 
+          GROUP_CONCAT(user_roles_table.nombre) as roles
+        FROM usuarios u
+        LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
+        LEFT JOIN roles user_roles_table ON ur.rol_id = user_roles_table.id
+        WHERE u.id = ?
+        GROUP BY u.id
+      `;
+      
+      const [result] = await pool.execute(query, [userId]);
+      return result[0] || null;
     }
 
-    return await query.get();
+    const query = `
+      SELECT 
+        u.*, 
+        GROUP_CONCAT(user_roles_table.nombre) as roles
+      FROM usuarios u
+      LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
+      LEFT JOIN roles user_roles_table ON ur.rol_id = user_roles_table.id
+      GROUP BY u.id
+    `;
+    
+    const [result] = await pool.execute(query);
+    return result;
   }
 
   /**
@@ -288,6 +362,9 @@ class UserRepository extends BaseRepository {
    * Busca usuarios que no tienen roles asignados
    */
   async findWithoutRoles() {
+    // Resetear el query builder para evitar conflictos
+    this.reset();
+    
     return await this
       .leftJoin('usuario_roles', 'usuarios.id', 'usuario_roles.usuario_id')
       .whereNull('usuario_roles.usuario_id')

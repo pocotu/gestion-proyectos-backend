@@ -103,11 +103,15 @@ class RoleRepository extends BaseRepository {
    * Obtiene roles con el conteo de usuarios asignados
    */
   async findWithUserCount() {
+    // Resetear el query builder para evitar conflictos
+    this.reset();
+    
     return await this
-      .select('roles.*, COUNT(usuario_roles.usuario_id) as user_count')
-      .leftJoin('usuario_roles', 'roles.id', 'usuario_roles.rol_id')
-      .groupBy('roles.id')
-      .orderBy('roles.nombre', 'ASC')
+      .select('role_count_table.*, COUNT(usuario_roles.usuario_id) as user_count')
+      .from('roles as role_count_table')
+      .leftJoin('usuario_roles', 'role_count_table.id', 'usuario_roles.rol_id')
+      .groupBy('role_count_table.id')
+      .orderBy('role_count_table.nombre', 'ASC')
       .get();
   }
 
@@ -115,11 +119,15 @@ class RoleRepository extends BaseRepository {
    * Busca roles asignados a un usuario específico
    */
   async findByUserId(userId) {
+    // Resetear el query builder para evitar conflictos
+    this.reset();
+    
     return await this
-      .select('roles.*')
-      .join('usuario_roles', 'roles.id', 'usuario_roles.rol_id')
+      .select('role_user_table.*')
+      .from('roles as role_user_table')
+      .join('usuario_roles', 'role_user_table.id', 'usuario_roles.rol_id')
       .where('usuario_roles.usuario_id', userId)
-      .orderBy('roles.nombre', 'ASC')
+      .orderBy('role_user_table.nombre', 'ASC')
       .get();
   }
 
@@ -131,7 +139,8 @@ class RoleRepository extends BaseRepository {
       SELECT usuarios.* 
       FROM usuarios 
       INNER JOIN usuario_roles ON usuarios.id = usuario_roles.usuario_id 
-      WHERE usuario_roles.rol_id = ?
+      INNER JOIN roles role_users_table ON usuario_roles.rol_id = role_users_table.id
+      WHERE role_users_table.id = ?
       ORDER BY usuarios.nombre ASC
     `, [roleId]);
   }
@@ -154,8 +163,8 @@ class RoleRepository extends BaseRepository {
     const result = await this.raw(`
       SELECT COUNT(*) as count 
       FROM usuario_roles ur 
-      INNER JOIN roles r ON ur.rol_id = r.id 
-      WHERE ur.usuario_id = ? AND r.nombre = ?
+      INNER JOIN roles role_check_table ON ur.rol_id = role_check_table.id 
+      WHERE ur.usuario_id = ? AND role_check_table.nombre = ?
     `, [userId, roleName]);
     return result[0].count > 0;
   }
@@ -172,10 +181,10 @@ class RoleRepository extends BaseRepository {
     const rolesWithoutUsers = totalRoles - rolesWithUsers[0].count;
 
     const mostUsedRole = await this.raw(`
-      SELECT r.nombre, COUNT(ur.usuario_id) as user_count
-      FROM roles r
-      LEFT JOIN usuario_roles ur ON r.id = ur.rol_id
-      GROUP BY r.id, r.nombre
+      SELECT role_stats_table.nombre, COUNT(ur.usuario_id) as user_count
+      FROM roles role_stats_table
+      LEFT JOIN usuario_roles ur ON role_stats_table.id = ur.rol_id
+      GROUP BY role_stats_table.id, role_stats_table.nombre
       ORDER BY user_count DESC
       LIMIT 1
     `);
@@ -192,11 +201,15 @@ class RoleRepository extends BaseRepository {
    * Busca roles que no están siendo usados
    */
   async findUnusedRoles() {
+    // Resetear el query builder para evitar conflictos
+    this.reset();
+    
     return await this
-      .select('roles.*')
-      .leftJoin('usuario_roles', 'roles.id', 'usuario_roles.rol_id')
+      .select('role_unused_table.*')
+      .from('roles as role_unused_table')
+      .leftJoin('usuario_roles', 'role_unused_table.id', 'usuario_roles.rol_id')
       .whereNull('usuario_roles.rol_id')
-      .orderBy('roles.nombre', 'ASC')
+      .orderBy('role_unused_table.nombre', 'ASC')
       .get();
   }
 

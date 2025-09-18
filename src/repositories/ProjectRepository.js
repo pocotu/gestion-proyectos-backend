@@ -71,9 +71,18 @@ class ProjectRepository extends BaseRepository {
   }
 
   /**
-   * Busca proyectos por título (búsqueda parcial)
+   * Busca un proyecto por título exacto
    */
   async findByTitle(titulo) {
+    return await this
+      .where('titulo', titulo)
+      .first();
+  }
+
+  /**
+   * Busca proyectos por título (búsqueda parcial)
+   */
+  async searchByTitle(titulo) {
     return await this
       .whereLike('titulo', `%${titulo}%`)
       .orderBy('created_at', 'DESC')
@@ -189,19 +198,20 @@ class ProjectRepository extends BaseRepository {
    * Crea un nuevo proyecto
    */
   async create(projectData) {
-    const { titulo, descripcion, fecha_inicio, fecha_fin, creado_por } = projectData;
+    const { titulo, descripcion, fecha_inicio, fecha_fin, creado_por, estado } = projectData;
 
     const data = {
       titulo,
       descripcion: descripcion || null,
       fecha_inicio: fecha_inicio || null,
       fecha_fin: fecha_fin || null,
-      creado_por: creado_por || null,
-      estado: 'planificacion',
+      creado_por: creado_por,
+      estado: estado || 'planificacion',
       created_at: new Date(),
       updated_at: new Date()
     };
 
+    console.log('ProjectRepository.create - datos a insertar:', data);
     return await this.insert(data);
   }
 
@@ -212,7 +222,22 @@ class ProjectRepository extends BaseRepository {
     const updateData = { ...projectData };
     updateData.updated_at = new Date();
 
-    return await this.where('id', id).update(updateData);
+    // Usar query SQL directa para evitar problemas con el query builder
+    const { pool } = require('../config/db');
+    
+    const fields = Object.keys(updateData);
+    const values = Object.values(updateData);
+    const setClause = fields.map(field => `${field} = ?`).join(', ');
+    
+    const query = `UPDATE ${this.tableName} SET ${setClause} WHERE id = ?`;
+    const [result] = await pool.execute(query, [...values, id]);
+    
+    if (result.affectedRows === 0) {
+      throw new Error('Proyecto no encontrado');
+    }
+    
+    // Retornar el proyecto actualizado
+    return await this.findById(id);
   }
 
   /**
@@ -413,6 +438,38 @@ class ProjectRepository extends BaseRepository {
       WHERE pr.proyecto_id IS NULL
       ORDER BY p.created_at DESC
     `);
+  }
+
+  /**
+   * Verifica si un usuario tiene acceso a un proyecto específico
+   * Un usuario tiene acceso si:
+   * - Es el creador del proyecto
+   * - Es responsable del proyecto
+   */
+  async hasUserAccess(projectId, userId) {
+    const { pool } = require('../config/db');
+    
+    // Verificar si es el creador
+    const [creatorCheck] = await pool.execute(`
+      SELECT 1 
+      FROM proyectos 
+      WHERE id = ? AND creado_por = ?
+      LIMIT 1
+    `, [projectId, userId]);
+    
+    if (creatorCheck && creatorCheck.length > 0) {
+      return true;
+    }
+
+    // Verificar si es responsable del proyecto
+    const [responsibleCheck] = await pool.execute(`
+      SELECT 1 
+      FROM proyecto_responsables 
+      WHERE proyecto_id = ? AND usuario_id = ? AND activo = TRUE
+      LIMIT 1
+    `, [projectId, userId]);
+
+    return responsibleCheck && responsibleCheck.length > 0;
   }
 }
 

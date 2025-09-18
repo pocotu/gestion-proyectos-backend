@@ -1,4 +1,5 @@
 const BaseRepository = require('./BaseRepository');
+const { pool } = require('../config/db');
 
 /**
  * TaskRepository - Repositorio para operaciones de tareas
@@ -58,13 +59,7 @@ class TaskRepository extends BaseRepository {
       prioridad,
       fecha_inicio,
       fecha_fin,
-      fecha_limite,
-      estimacion_horas,
-      horas_trabajadas: 0,
-      asignado_a,
-      creado_por,
-      padre_tarea_id,
-      porcentaje_completado,
+      usuario_asignado_id: asignado_a || null,
       created_at: new Date(),
       updated_at: new Date()
     });
@@ -84,11 +79,123 @@ class TaskRepository extends BaseRepository {
         padre.titulo as padre_titulo
       `)
       .leftJoin('proyectos', 'tareas.proyecto_id', 'proyectos.id')
-      .leftJoin('usuarios as asignado', 'tareas.asignado_a', 'asignado.id')
+      .leftJoin('usuarios as asignado', 'tareas.usuario_asignado_id', 'asignado.id')
       .leftJoin('usuarios as creador', 'tareas.creado_por', 'creador.id')
       .leftJoin('tareas as padre', 'tareas.padre_tarea_id', 'padre.id')
       .where('tareas.id', id)
       .first();
+  }
+
+  /**
+   * Obtiene todas las tareas con filtros y paginación
+   */
+  async findAll({ limit = 10, offset = 0, filters = {}, userId = null, isAdmin = false }) {
+    console.log('TaskRepository.findAll - Iniciando con parámetros:', { limit, offset, filters, userId, isAdmin });
+    
+    try {
+      // Usar directamente el método get del BaseRepository sin query builder complejo
+      let sql = `SELECT * FROM ${this.tableName}`;
+      let params = [];
+      let whereConditions = [];
+
+      // Aplicar filtros básicos
+      if (filters.estado) {
+        whereConditions.push('estado = ?');
+        params.push(filters.estado);
+      }
+      
+      if (filters.prioridad) {
+        whereConditions.push('prioridad = ?');
+        params.push(filters.prioridad);
+      }
+      
+      if (filters.proyecto_id) {
+        whereConditions.push('proyecto_id = ?');
+        params.push(filters.proyecto_id);
+      }
+
+      // Si no es admin, filtrar por acceso del usuario
+      if (!isAdmin && userId) {
+        whereConditions.push('(asignado_a = ? OR creado_por = ?)');
+        params.push(userId, userId);
+      }
+
+      if (whereConditions.length > 0) {
+        sql += ' WHERE ' + whereConditions.join(' AND ');
+      }
+
+      sql += ' ORDER BY created_at DESC';
+      
+      if (limit) {
+        sql += ` LIMIT ${limit}`;
+        if (offset) {
+          sql += ` OFFSET ${offset}`;
+        }
+      }
+
+      console.log('TaskRepository.findAll - SQL:', sql);
+      console.log('TaskRepository.findAll - Params:', params);
+
+      const [rows] = await pool.execute(sql, params);
+
+      console.log('TaskRepository.findAll - Encontradas', rows.length, 'tareas');
+      return rows;
+    } catch (error) {
+      console.error('Error en TaskRepository.findAll:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cuenta el total de tareas con filtros
+   */
+  async count(filters = {}, userId = null, isAdmin = false) {
+    console.log('TaskRepository.count - Iniciando con parámetros:', { filters, userId, isAdmin });
+    
+    try {
+      // Usar SQL directo para el count también
+      let sql = `SELECT COUNT(*) as total FROM ${this.tableName}`;
+      let params = [];
+      let whereConditions = [];
+
+      // Aplicar filtros básicos
+      if (filters.estado) {
+        whereConditions.push('estado = ?');
+        params.push(filters.estado);
+      }
+      
+      if (filters.prioridad) {
+        whereConditions.push('prioridad = ?');
+        params.push(filters.prioridad);
+      }
+      
+      if (filters.proyecto_id) {
+        whereConditions.push('proyecto_id = ?');
+        params.push(filters.proyecto_id);
+      }
+
+      // Si no es admin, filtrar por acceso del usuario
+      if (!isAdmin && userId) {
+        whereConditions.push('(asignado_a = ? OR creado_por = ?)');
+        params.push(userId, userId);
+      }
+
+      if (whereConditions.length > 0) {
+        sql += ' WHERE ' + whereConditions.join(' AND ');
+      }
+
+      console.log('TaskRepository.count - SQL:', sql);
+      console.log('TaskRepository.count - Params:', params);
+
+      const [rows] = await pool.execute(sql, params);
+      const total = rows[0]?.total || 0;
+
+      console.log('TaskRepository.count - Total encontrado:', total);
+      return total;
+    } catch (error) {
+      console.error('Error en TaskRepository.count:', error);
+      throw error;
+    }
   }
 
   /**
@@ -102,7 +209,7 @@ class TaskRepository extends BaseRepository {
         asignado.email as asignado_email,
         creador.nombre as creador_nombre
       `)
-      .leftJoin('usuarios as asignado', 'tareas.asignado_a', 'asignado.id')
+      .leftJoin('usuarios as asignado', 'tareas.usuario_asignado_id', 'asignado.id')
       .leftJoin('usuarios as creador', 'tareas.creado_por', 'creador.id')
       .where('tareas.proyecto_id', proyecto_id);
 
@@ -208,7 +315,7 @@ class TaskRepository extends BaseRepository {
         asignado.nombre as asignado_nombre,
         asignado.email as asignado_email
       `)
-      .leftJoin('usuarios as asignado', 'tareas.asignado_a', 'asignado.id')
+      .leftJoin('usuarios as asignado', 'tareas.usuario_asignado_id', 'asignado.id')
       .where('tareas.padre_tarea_id', padre_tarea_id)
       .orderBy('tareas.created_at', 'ASC')
       .get();
@@ -225,7 +332,7 @@ class TaskRepository extends BaseRepository {
         asignado.email as asignado_email,
         creador.nombre as creador_nombre
       `)
-      .leftJoin('usuarios as asignado', 'tareas.asignado_a', 'asignado.id')
+      .leftJoin('usuarios as asignado', 'tareas.usuario_asignado_id', 'asignado.id')
       .leftJoin('usuarios as creador', 'tareas.creado_por', 'creador.id')
       .where('tareas.proyecto_id', proyecto_id)
       .whereNull('tareas.padre_tarea_id')
@@ -239,7 +346,7 @@ class TaskRepository extends BaseRepository {
    */
   async assignTask(id, usuario_id) {
     return await this.where('id', id).update({
-      asignado_a: usuario_id,
+      usuario_asignado_id: usuario_id,
       updated_at: new Date()
     });
   }
@@ -249,7 +356,7 @@ class TaskRepository extends BaseRepository {
    */
   async unassignTask(id) {
     return await this.where('id', id).update({
-      asignado_a: null,
+      usuario_asignado_id: null,
       updated_at: new Date()
     });
   }
@@ -266,7 +373,7 @@ class TaskRepository extends BaseRepository {
         asignado.email as asignado_email
       `)
       .join('proyectos', 'tareas.proyecto_id', 'proyectos.id')
-      .leftJoin('usuarios as asignado', 'tareas.asignado_a', 'asignado.id')
+      .leftJoin('usuarios as asignado', 'tareas.usuario_asignado_id', 'asignado.id')
       .where('tareas.estado', estado);
 
     if (proyecto_id) {
@@ -494,7 +601,7 @@ class TaskRepository extends BaseRepository {
       estado: newData.estado || 'pendiente',
       porcentaje_completado: 0,
       horas_trabajadas: 0,
-      asignado_a: newData.asignado_a || null,
+      usuario_asignado_id: newData.usuario_asignado_id || null,
       padre_tarea_id: newData.padre_tarea_id || originalTask.padre_tarea_id,
       created_at: new Date(),
       updated_at: new Date()
@@ -557,7 +664,7 @@ class TaskRepository extends BaseRepository {
       throw new Error('Se requiere un array de IDs de tareas');
     }
 
-    const allowedFields = ['estado', 'prioridad', 'asignado_a', 'fecha_limite', 'porcentaje_completado'];
+    const allowedFields = ['estado', 'prioridad', 'usuario_asignado_id', 'fecha_limite', 'porcentaje_completado'];
     const filteredData = {};
     
     Object.keys(updateData).forEach(key => {
@@ -582,6 +689,157 @@ class TaskRepository extends BaseRepository {
       .where('estado', 'completada')
       .where('updated_at', '<', cutoffDate)
       .delete();
+  }
+
+  /**
+   * Eliminar tarea por ID
+   */
+  async deleteById(id) {
+    return await this.where('id', id).delete();
+  }
+
+  /**
+   * Verificar si un proyecto existe
+   */
+  async projectExists(proyecto_id) {
+    try {
+      console.log('Verificando existencia del proyecto:', proyecto_id);
+      const [result] = await pool.execute(
+        'SELECT 1 FROM proyectos WHERE id = ? LIMIT 1',
+        [proyecto_id]
+      );
+      console.log('Resultado de la consulta:', result);
+      const exists = result && result.length > 0;
+      console.log('Proyecto existe:', exists);
+      return exists;
+    } catch (error) {
+      console.error('Error verificando existencia del proyecto:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Verifica si un usuario tiene acceso a una tarea específica
+   * Un usuario tiene acceso si:
+   * - Es el usuario asignado a la tarea
+   * - Es el creador de la tarea
+   * - Es responsable del proyecto al que pertenece la tarea
+   */
+  async hasUserAccess(taskId, userId) {
+    const { pool } = require('../config/db');
+    
+    // Verificar si es el usuario asignado o el creador
+    const [taskCheck] = await pool.execute(`
+      SELECT 1 
+      FROM tareas 
+      WHERE id = ? AND (usuario_asignado_id = ? OR creado_por = ?)
+      LIMIT 1
+    `, [taskId, userId, userId]);
+    
+    if (taskCheck && taskCheck.length > 0) {
+      return true;
+    }
+
+    // Verificar si es responsable del proyecto
+    const [projectCheck] = await pool.execute(`
+      SELECT 1 
+      FROM tareas t
+      JOIN proyecto_responsables pr ON t.proyecto_id = pr.proyecto_id
+      WHERE t.id = ? AND pr.usuario_id = ? AND pr.activo = TRUE
+      LIMIT 1
+    `, [taskId, userId]);
+
+    return projectCheck && projectCheck.length > 0;
+  }
+
+  /**
+   * Verifica si un proyecto existe
+   */
+  async projectExists(projectId) {
+    const { pool } = require('../config/db');
+    
+    const [result] = await pool.execute(`
+      SELECT 1 
+      FROM proyectos 
+      WHERE id = ?
+      LIMIT 1
+    `, [projectId]);
+
+    return result && result.length > 0;
+  }
+
+  /**
+   * Actualizar una tarea por ID
+   */
+  async update(id, taskData) {
+    try {
+      const updateData = { ...taskData };
+      updateData.updated_at = new Date();
+  
+      // Usar query SQL directa para evitar problemas con el query builder
+      const { pool } = require('../config/db');
+      
+      const fields = Object.keys(updateData);
+      const values = Object.values(updateData);
+      const setClause = fields.map(field => `${field} = ?`).join(', ');
+      
+      const query = `UPDATE ${this.tableName} SET ${setClause} WHERE id = ?`;
+      const [result] = await pool.execute(query, [...values, id]);
+      
+      if (result.affectedRows === 0) {
+        throw new Error('Tarea no encontrada');
+      }
+      
+      // Retornar la tarea actualizada
+      return await this.findById(id);
+    } catch (error) {
+      console.error('Error en TaskRepository.update:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verificar si un usuario tiene acceso a una tarea
+   * Un usuario tiene acceso si:
+   * - Es el usuario asignado a la tarea
+   * - Es el creador de la tarea
+   * - Es responsable del proyecto al que pertenece la tarea
+   */
+  async hasUserAccess(taskId, userId) {
+    try {
+      const query = `
+        SELECT 1 
+        FROM tareas t
+        LEFT JOIN proyecto_responsables pr ON t.proyecto_id = pr.proyecto_id
+        WHERE t.id = ? 
+        AND (
+          t.usuario_asignado_id = ? 
+          OR t.creado_por = ?
+          OR (pr.usuario_id = ? AND pr.activo = TRUE)
+        )
+        LIMIT 1
+      `;
+      
+      const [result] = await pool.execute(query, [taskId, userId, userId, userId]);
+      return result && result.length > 0;
+    } catch (error) {
+      console.error('Error en TaskRepository.hasUserAccess:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Verificar si un proyecto existe
+   */
+  async projectExists(projectId) {
+    try {
+      const query = `SELECT 1 FROM proyectos WHERE id = ? LIMIT 1`;
+      const [result] = await pool.execute(query, [projectId]);
+      return result && result.length > 0;
+    } catch (error) {
+      console.error('Error en TaskRepository.projectExists:', error);
+      return false;
+    }
   }
 }
 

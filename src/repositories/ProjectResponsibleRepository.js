@@ -1,4 +1,5 @@
 const BaseRepository = require('./BaseRepository');
+const { pool } = require('../config/db');
 
 /**
  * ProjectResponsibleRepository - Repositorio para la relación muchos-a-muchos proyectos-responsables
@@ -90,14 +91,22 @@ class ProjectResponsibleRepository extends BaseRepository {
    * Obtiene todos los responsables activos de un proyecto
    */
   async getProjectResponsibles(proyecto_id) {
-    return await this
-      .select('proyecto_responsables.*, usuarios.nombre as usuario_nombre, usuarios.email, asignador.nombre as asignado_por_nombre')
-      .join('usuarios', 'proyecto_responsables.usuario_id', 'usuarios.id')
-      .leftJoin('usuarios as asignador', 'proyecto_responsables.asignado_por', 'asignador.id')
-      .where('proyecto_responsables.proyecto_id', proyecto_id)
-      .where('proyecto_responsables.activo', true)
-      .orderBy('proyecto_responsables.rol_responsabilidad', 'ASC')
-      .get();
+    // Usar consulta SQL directa para evitar problemas con el query builder
+    const query = `
+      SELECT 
+        pr.*, 
+        u.nombre as usuario_nombre, 
+        u.email, 
+        asignador.nombre as asignado_por_nombre
+      FROM proyecto_responsables pr
+      INNER JOIN usuarios u ON pr.usuario_id = u.id
+      LEFT JOIN usuarios asignador ON pr.asignado_por = asignador.id
+      WHERE pr.proyecto_id = ? AND pr.activo = ?
+      ORDER BY pr.rol_responsabilidad ASC
+    `;
+    
+    const [rows] = await pool.execute(query, [proyecto_id, true]);
+    return rows;
   }
 
   /**

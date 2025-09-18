@@ -1,0 +1,10 @@
+{
+  "titulo": "Tarea de prueba",
+  "descripcion": "Esta es una tarea de prueba para el endpoint POST /api/tasks",
+  "proyecto_id": 4,
+  "prioridad": "media",
+  "fecha_inicio": "2025-01-01",
+  "fecha_fin": "2025-01-15",
+  "fecha_limite": "2025-01-15",
+  "estimacion_horas": 8
+}
