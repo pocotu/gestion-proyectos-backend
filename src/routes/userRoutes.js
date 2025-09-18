@@ -38,6 +38,18 @@ router.put('/profile', userController.updateProfile.bind(userController));
 // PUT /api/users/change-password
 router.put('/change-password', authController.changePassword.bind(authController));
 
+// Obtener configuraciones del usuario actual
+// GET /api/users/settings
+router.get('/settings', userController.getUserSettings.bind(userController));
+
+// Actualizar configuraciones del usuario actual
+// PUT /api/users/settings
+router.put('/settings', userController.updateUserSettings.bind(userController));
+
+// Restablecer configuraciones a valores por defecto
+// POST /api/users/settings/reset
+router.post('/settings/reset', userController.resetUserSettings.bind(userController));
+
 /**
  * Rutas que requieren permisos de gestión de usuarios
  */

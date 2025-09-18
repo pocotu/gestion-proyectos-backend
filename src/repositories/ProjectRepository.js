@@ -473,6 +473,72 @@ class ProjectRepository extends BaseRepository {
       return false;
     }
   }
+
+  /**
+   * Obtener estadísticas generales de proyectos
+   */
+  async getOverviewStats(userId = null, isAdmin = false) {
+    try {
+      const { pool } = require('../config/db');
+      let baseQuery = 'SELECT COUNT(*) as count FROM proyectos';
+      let whereClause = '';
+      let params = [];
+      
+      if (!isAdmin && userId) {
+        baseQuery = 'SELECT COUNT(DISTINCT proyectos.id) as count FROM proyectos LEFT JOIN proyecto_responsables ON proyectos.id = proyecto_responsables.proyecto_id';
+        whereClause = ' WHERE proyecto_responsables.usuario_id = ? AND proyecto_responsables.activo = true';
+        params = [userId];
+      }
+
+      const [total] = await pool.execute(baseQuery + whereClause, params);
+      const [completados] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' proyectos.estado = ?', [...params, 'completado']);
+      const [planificacion] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' proyectos.estado = ?', [...params, 'planificacion']);
+      const [en_progreso] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' proyectos.estado = ?', [...params, 'en_progreso']);
+      const [cancelados] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' proyectos.estado = ?', [...params, 'cancelado']);
+
+      // Calculamos activos como la suma de planificacion + en_progreso
+      const activos = parseInt(planificacion[0].count) + parseInt(en_progreso[0].count);
+
+      return {
+        total: parseInt(total[0].count) || 0,
+        activos: activos || 0,
+        completados: parseInt(completados[0].count) || 0,
+        planificacion: parseInt(planificacion[0].count) || 0,
+        en_progreso: parseInt(en_progreso[0].count) || 0,
+        cancelados: parseInt(cancelados[0].count) || 0
+      };
+    } catch (error) {
+      console.error('Error en ProjectRepository.getOverviewStats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener proyectos recientes
+   */
+  async findRecent(userId = null, isAdmin = false, limit = 5) {
+    try {
+      const { pool } = require('../config/db');
+      let query = 'SELECT proyectos.* FROM proyectos';
+      let whereClause = '';
+      let params = [];
+      
+      if (!isAdmin && userId) {
+        query += ' LEFT JOIN proyecto_responsables ON proyectos.id = proyecto_responsables.proyecto_id';
+        whereClause = ' WHERE proyecto_responsables.usuario_id = ? AND proyecto_responsables.activo = true';
+        params = [userId];
+      }
+
+      query += whereClause + ' ORDER BY proyectos.fecha_creacion DESC LIMIT ?';
+      params.push(limit);
+
+      const [rows] = await pool.execute(query, params);
+      return rows;
+    } catch (error) {
+      console.error('Error en ProjectRepository.findRecent:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = ProjectRepository;

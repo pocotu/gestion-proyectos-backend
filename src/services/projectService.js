@@ -465,6 +465,19 @@ class ProjectService {
       return false;
     }
   }
+
+  /**
+   * Obtener proyectos recientes
+   */
+  async getRecentProjects(userId = null, isAdmin = false, limit = 5) {
+    try {
+      const projects = await this.projectRepository.findRecent(userId, isAdmin, limit);
+      return projects;
+    } catch (error) {
+      console.error('Error en ProjectService.getRecentProjects:', error);
+      throw new Error('Error obteniendo proyectos recientes');
+    }
+  }
 }
 
 module.exports = ProjectService;

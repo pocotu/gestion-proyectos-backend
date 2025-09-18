@@ -128,9 +128,9 @@ class AuthService {
   async verifyToken(token) {
     try {
       // Verificar y decodificar el token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, config.JWT_SECRET);
       
-      // Buscar el usuario en la base de datos
+      // Buscar el usuario en la base de datos usando id (no userId)
       const user = await this.userRepository.findById(decoded.id);
       
       if (!user) {

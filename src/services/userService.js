@@ -1,4 +1,5 @@
 const UserRepository = require('../repositories/UserRepository');
+const RoleService = require('./roleService');
 const config = require('../config/config');
 const bcrypt = require('bcrypt');
 
@@ -14,6 +15,7 @@ const bcrypt = require('bcrypt');
 class UserService {
   constructor() {
     this.userRepository = new UserRepository();
+    this.roleService = new RoleService();
   }
 
   /**
@@ -288,6 +290,32 @@ class UserService {
   }
 
   /**
+   * Asignar rol a usuario
+   */
+  async assignRoleToUser(userId, roleId, assignedBy) {
+    try {
+      const result = await this.roleService.assignRole(userId, roleId, assignedBy);
+      return result;
+    } catch (error) {
+      console.error('Error en UserService.assignRoleToUser:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remover rol de usuario
+   */
+  async removeRoleFromUser(userId, roleId) {
+    try {
+      const result = await this.roleService.removeRole(userId, roleId);
+      return result;
+    } catch (error) {
+      console.error('Error en UserService.removeRoleFromUser:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Sanitizar datos del usuario (remover información sensible)
    */
   sanitizeUser(user) {
@@ -295,6 +323,40 @@ class UserService {
     
     const { contraseña, ...sanitizedUser } = user;
     return sanitizedUser;
+  }
+
+  /**
+   * Obtener estadísticas de usuarios (para dashboard admin)
+   */
+  async getUserStatistics() {
+    try {
+      const totalUsers = await this.userRepository.count();
+      const activeUsers = await this.userRepository.count({ activo: true });
+      const adminUsers = await this.userRepository.count({ es_administrador: true });
+      
+      return {
+        total: totalUsers,
+        active: activeUsers,
+        admins: adminUsers,
+        inactive: totalUsers - activeUsers
+      };
+    } catch (error) {
+      console.error('Error en UserService.getUserStatistics:', error);
+      throw new Error('Error obteniendo estadísticas de usuarios');
+    }
+  }
+
+  /**
+   * Obtener estadísticas generales de usuarios para el dashboard
+   */
+  async getUsersOverview() {
+    try {
+      const stats = await this.getUserStatistics();
+      return stats;
+    } catch (error) {
+      console.error('Error en UserService.getUsersOverview:', error);
+      throw new Error('Error obteniendo estadísticas de usuarios');
+    }
   }
 }
 

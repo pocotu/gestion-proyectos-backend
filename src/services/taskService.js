@@ -658,6 +658,58 @@ class TaskService {
       return false;
     }
   }
+
+  /**
+   * Obtener estadísticas de tareas
+   */
+  async getTaskStatistics(userId = null, isAdmin = false) {
+    try {
+      const stats = await this.taskRepository.getStatistics(userId, isAdmin);
+      return stats;
+    } catch (error) {
+      console.error('Error en TaskService.getTaskStatistics:', error);
+      throw new Error('Error obteniendo estadísticas de tareas');
+    }
+  }
+
+  /**
+   * Obtener estadísticas generales de tareas para el dashboard
+   */
+  async getTasksOverview(userId = null, isAdmin = false) {
+    try {
+      const stats = await this.taskRepository.getOverviewStats(userId, isAdmin);
+      return stats;
+    } catch (error) {
+      console.error('Error en TaskService.getTasksOverview:', error);
+      throw new Error('Error obteniendo estadísticas de tareas');
+    }
+  }
+
+  /**
+   * Obtener tareas recientes
+   */
+  async getRecentTasks(userId = null, isAdmin = false, limit = 5) {
+    try {
+      const tasks = await this.taskRepository.findRecent(userId, isAdmin, limit);
+      return tasks;
+    } catch (error) {
+      console.error('Error en TaskService.getRecentTasks:', error);
+      throw new Error('Error obteniendo tareas recientes');
+    }
+  }
+
+  /**
+   * Obtener tareas pendientes
+   */
+  async getPendingTasks(userId = null, isAdmin = false) {
+    try {
+      const tasks = await this.taskRepository.findPending(userId, isAdmin);
+      return tasks;
+    } catch (error) {
+      console.error('Error en TaskService.getPendingTasks:', error);
+      throw new Error('Error obteniendo tareas pendientes');
+    }
+  }
 }
 
 module.exports = TaskService;

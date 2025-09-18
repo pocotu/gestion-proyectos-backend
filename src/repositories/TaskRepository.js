@@ -757,6 +757,125 @@ class TaskRepository extends BaseRepository {
       throw error;
     }
   }
+
+  /**
+   * Obtener estadísticas de tareas
+   */
+  async getStatistics(userId = null, isAdmin = false) {
+    try {
+      const { pool } = require('../config/db');
+      let baseQuery = 'SELECT COUNT(*) as count FROM tareas';
+      let whereClause = '';
+      let params = [];
+      
+      if (!isAdmin && userId) {
+        whereClause = ' WHERE usuario_asignado_id = ?';
+        params = [userId];
+      }
+
+      const [total] = await pool.execute(baseQuery + whereClause, params);
+      const [pendientes] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'pendiente']);
+      const [en_progreso] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'en_progreso']);
+      const [completadas] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'completada']);
+      const [alta] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' prioridad = ?', [...params, 'alta']);
+      const [media] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' prioridad = ?', [...params, 'media']);
+      const [baja] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' prioridad = ?', [...params, 'baja']);
+
+      return {
+        total: parseInt(total[0].count) || 0,
+        pendientes: parseInt(pendientes[0].count) || 0,
+        en_progreso: parseInt(en_progreso[0].count) || 0,
+        completadas: parseInt(completadas[0].count) || 0,
+        alta: parseInt(alta[0].count) || 0,
+        media: parseInt(media[0].count) || 0,
+        baja: parseInt(baja[0].count) || 0
+      };
+    } catch (error) {
+      console.error('Error en TaskRepository.getStatistics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener estadísticas generales de tareas para el dashboard
+   */
+  async getOverviewStats(userId = null, isAdmin = false) {
+    try {
+      const { pool } = require('../config/db');
+      let baseQuery = 'SELECT COUNT(*) as count FROM tareas';
+      let whereClause = '';
+      let params = [];
+      
+      if (!isAdmin && userId) {
+        whereClause = ' WHERE usuario_asignado_id = ?';
+        params = [userId];
+      }
+
+      const [total] = await pool.execute(baseQuery + whereClause, params);
+      const [pendientes] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'pendiente']);
+      const [en_progreso] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'en_progreso']);
+      const [en_revision] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'en_revision']);
+      const [completadas] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'completada']);
+
+      return {
+        total: parseInt(total[0].count) || 0,
+        pendientes: parseInt(pendientes[0].count) || 0,
+        en_progreso: parseInt(en_progreso[0].count) || 0,
+        en_revision: parseInt(en_revision[0].count) || 0,
+        completadas: parseInt(completadas[0].count) || 0
+      };
+    } catch (error) {
+      console.error('Error en TaskRepository.getOverviewStats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener tareas recientes
+   */
+  async findRecent(userId = null, isAdmin = false, limit = 5) {
+    try {
+      this.reset()
+        .select('tareas.*, proyectos.titulo as proyecto_titulo')
+        .from('tareas')
+        .leftJoin('proyectos', 'tareas.proyecto_id', '=', 'proyectos.id')
+        .orderBy('tareas.created_at', 'desc')
+        .limit(limit);
+
+      if (!isAdmin && userId) {
+        this.where('tareas.usuario_asignado_id', '=', userId);
+      }
+
+      return await this.get();
+    } catch (error) {
+      console.error('Error en TaskRepository.findRecent:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener tareas pendientes
+   */
+  async findPending(userId = null, isAdmin = false) {
+    try {
+      this.reset()
+        .select('tareas.*, proyectos.titulo as proyecto_titulo')
+        .from('tareas')
+        .leftJoin('proyectos', 'tareas.proyecto_id', '=', 'proyectos.id')
+        .where('tareas.estado', '=', 'pendiente')
+        .orderBy('tareas.prioridad', 'desc')
+        .orderBy('tareas.fecha_fin', 'asc');
+
+      if (!isAdmin && userId) {
+        this.where('tareas.usuario_asignado_id', '=', userId);
+      }
+
+      return await this.get();
+    } catch (error) {
+      console.error('Error en TaskRepository.findPending:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = TaskRepository;

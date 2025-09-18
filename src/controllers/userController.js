@@ -1,4 +1,5 @@
 const UserService = require('../services/userService');
+const UserSettingsService = require('../services/userSettingsService');
 const { 
   requirePermission, 
   requireUserManagement, 
@@ -18,6 +19,7 @@ const {
 class UserController {
   constructor() {
     this.userService = new UserService();
+    this.userSettingsService = new UserSettingsService();
   }
 
   /**
@@ -522,6 +524,90 @@ class UserController {
 
     } catch (error) {
       console.error('Error obteniendo usuarios disponibles para tareas:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  /**
+   * Obtener configuraciones del usuario actual
+   * GET /api/users/settings
+   * Permisos: Usuario autenticado (propias configuraciones)
+   */
+  async getUserSettings(req, res) {
+    try {
+      const userId = req.user.id;
+      const settings = await this.userSettingsService.getUserSettings(userId);
+
+      res.json({
+        success: true,
+        data: { settings }
+      });
+
+    } catch (error) {
+      console.error('Error obteniendo configuraciones:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  /**
+   * Actualizar configuraciones del usuario actual
+   * PUT /api/users/settings
+   * Permisos: Usuario autenticado (propias configuraciones)
+   */
+  async updateUserSettings(req, res) {
+    try {
+      const userId = req.user.id;
+      const settings = req.body;
+
+      const updatedSettings = await this.userSettingsService.updateUserSettings(userId, settings);
+
+      res.json({
+        success: true,
+        message: 'Configuraciones actualizadas exitosamente',
+        data: { settings: updatedSettings }
+      });
+
+    } catch (error) {
+      console.error('Error actualizando configuraciones:', error);
+      
+      if (error.message.includes('inválido') || error.message.includes('debe ser')) {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  /**
+   * Restablecer configuraciones a valores por defecto
+   * POST /api/users/settings/reset
+   * Permisos: Usuario autenticado (propias configuraciones)
+   */
+  async resetUserSettings(req, res) {
+    try {
+      const userId = req.user.id;
+      const defaultSettings = await this.userSettingsService.resetToDefaults(userId);
+
+      res.json({
+        success: true,
+        message: 'Configuraciones restablecidas a valores por defecto',
+        data: { settings: defaultSettings }
+      });
+
+    } catch (error) {
+      console.error('Error restableciendo configuraciones:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
