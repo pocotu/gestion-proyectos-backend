@@ -1,5 +1,6 @@
 const express = require('express');
 const AuthController = require('../controllers/authController');
+const config = require('../config/config');
 const { authenticate, requireAdmin, requireOwnershipOrAdmin, rateLimitByUser } = require('../middleware/authMiddleware');
 
 /**
@@ -92,7 +93,7 @@ router.get('/profile', authenticate(), async (req, res) => {
  */
 router.put('/change-password', 
   authenticate(), 
-  rateLimitByUser(5, 15 * 60 * 1000), // Máximo 5 intentos cada 15 minutos
+  rateLimitByUser(config.AUTH_RATE_LIMIT_MAX_REQUESTS, config.AUTH_RATE_LIMIT_WINDOW_MS), // Rate limiting configurable
   async (req, res) => {
     await authController.changePassword(req, res);
   }

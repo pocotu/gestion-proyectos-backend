@@ -1,43 +1,40 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { pool } = require('../config/db');
 const config = require('../config/config');
+const BaseRepository = require('../repositories/BaseRepository');
 
 /**
- * RefreshTokenService - Servicio para manejo de refresh tokens y blacklist
+ * RefreshTokenService - Servicio para manejo de refresh tokens
  * Siguiendo principios SOLID:
- * - Single Responsibility: Solo maneja refresh tokens y blacklist
+ * - Single Responsibility: Solo maneja refresh tokens
  * - Open/Closed: Abierto para extensión (nuevos tipos de tokens)
- * - Liskov Substitution: Puede ser sustituido por otros servicios de token
- * - Interface Segregation: Métodos específicos para refresh tokens
- * - Dependency Inversion: Depende de abstracciones (db, config)
+ * - Liskov Substitution: Puede ser sustituido por otros servicios de tokens
+ * - Interface Segregation: Métodos específicos para cada operación
+ * - Dependency Inversion: Depende de abstracciones de base de datos
  */
 class RefreshTokenService {
   constructor() {
-    this.refreshTokenExpiry = 7 * 24 * 60 * 60 * 1000; // 7 días en milisegundos
+    this.baseRepository = new BaseRepository();
   }
 
   /**
    * Genera un nuevo refresh token para un usuario
-   * @param {number} userId - ID del usuario
-   * @returns {Promise<string>} Token de refresco generado
    */
   async generateRefreshToken(userId) {
     try {
-      // Generar token único y seguro
+      // Generar token único
       const token = crypto.randomBytes(64).toString('hex');
-      const expiresAt = new Date(Date.now() + this.refreshTokenExpiry);
-
-      // Revocar tokens anteriores del usuario (opcional: mantener solo uno activo)
-      await this._revokeUserRefreshTokens(userId);
-
-      // Guardar en base de datos
-      const query = `
-        INSERT INTO refresh_tokens (token, usuario_id, expires_at)
-        VALUES (?, ?, ?)
-      `;
       
-      await pool.execute(query, [token, userId, expiresAt]);
+      // Configurar expiración (configurable)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + config.REFRESH_TOKEN_EXPIRY_DAYS);
+
+      // Usar conexión directa para evitar problemas con el query builder
+      const { pool } = require('../config/db');
+      await pool.execute(
+        'INSERT INTO refresh_tokens (token, usuario_id, expires_at, created_at) VALUES (?, ?, ?, NOW())',
+        [token, userId, expiresAt]
+      );
 
       return token;
 
@@ -48,26 +45,19 @@ class RefreshTokenService {
 
   /**
    * Valida un refresh token
-   * @param {string} token - Token de refresco
-   * @returns {Promise<Object>} Datos del token si es válido
    */
   async validateRefreshToken(token) {
     try {
       if (!token) {
-        throw new Error('Token de refresco no proporcionado');
+        throw new Error('Token de refresco requerido');
       }
 
-      const query = `
-        SELECT rt.*, u.id as user_id, u.email, u.es_administrador, u.estado
-        FROM refresh_tokens rt
-        INNER JOIN usuarios u ON rt.usuario_id = u.id
-        WHERE rt.token = ? 
-          AND rt.expires_at > NOW() 
-          AND rt.is_revoked = FALSE
-          AND u.estado = 1
-      `;
-
-      const [rows] = await pool.execute(query, [token]);
+      // Usar conexión directa para evitar problemas con el query builder
+      const { pool } = require('../config/db');
+      const [rows] = await pool.execute(
+        'SELECT * FROM refresh_tokens WHERE token = ? AND is_revoked = 0 AND expires_at > NOW()',
+        [token]
+      );
 
       if (rows.length === 0) {
         throw new Error('Token de refresco inválido o expirado');
@@ -82,18 +72,16 @@ class RefreshTokenService {
 
   /**
    * Revoca un refresh token específico
-   * @param {string} token - Token de refresco a revocar
-   * @returns {Promise<boolean>} Éxito de la operación
    */
   async revokeRefreshToken(token) {
     try {
-      const query = `
-        UPDATE refresh_tokens 
-        SET is_revoked = TRUE, updated_at = NOW()
-        WHERE token = ?
-      `;
+      // Usar conexión directa para evitar problemas con el query builder
+      const { pool } = require('../config/db');
+      const [result] = await pool.execute(
+        'UPDATE refresh_tokens SET is_revoked = 1, updated_at = NOW() WHERE token = ?',
+        [token]
+      );
 
-      const [result] = await pool.execute(query, [token]);
       return result.affectedRows > 0;
 
     } catch (error) {
@@ -103,19 +91,15 @@ class RefreshTokenService {
 
   /**
    * Revoca todos los refresh tokens de un usuario
-   * @param {number} userId - ID del usuario
-   * @returns {Promise<boolean>} Éxito de la operación
    */
   async revokeAllUserRefreshTokens(userId) {
     try {
-      const query = `
-        UPDATE refresh_tokens 
-        SET is_revoked = TRUE, updated_at = NOW()
-        WHERE usuario_id = ? AND is_revoked = FALSE
-      `;
+      // Marcar todos los tokens del usuario como revocados usando query builder
+      const result = await this.baseRepository.db('refresh_tokens')
+        .where('usuario_id', userId)
+        .update({ revoked: true });
 
-      const [result] = await pool.execute(query, [userId]);
-      return result.affectedRows >= 0;
+      return result;
 
     } catch (error) {
       throw new Error(`Error revocando tokens del usuario: ${error.message}`);
@@ -123,88 +107,78 @@ class RefreshTokenService {
   }
 
   /**
-   * Agrega un JWT a la blacklist (para logout)
-   * @param {string} token - JWT token
-   * @param {number} userId - ID del usuario
-   * @returns {Promise<boolean>} Éxito de la operación
+   * Añade un JWT a la blacklist
    */
   async blacklistJWT(token, userId) {
     try {
-      // Decodificar token para obtener JTI y expiración
+      // Decodificar el token para obtener información
       const decoded = jwt.decode(token);
-      if (!decoded) {
-        throw new Error('Token JWT inválido');
-      }
+      const jti = decoded?.jti || crypto.randomUUID();
+      const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + config.JWT_BLACKLIST_FALLBACK_HOURS * 60 * 60 * 1000);
 
-      // Generar JTI si no existe (usando hash del token)
-      const jti = decoded.jti || crypto.createHash('sha256').update(token).digest('hex');
-      const expiresAt = new Date(decoded.exp * 1000); // exp está en segundos
-
-      const query = `
-        INSERT INTO token_blacklist (token_jti, usuario_id, expires_at)
-        VALUES (?, ?, ?)
-        ON DUPLICATE KEY UPDATE updated_at = NOW()
-      `;
-
-      await pool.execute(query, [jti, userId, expiresAt]);
-      return true;
+      // Usar conexión directa para evitar problemas con el query builder
+      const { pool } = require('../config/db');
+      await pool.execute(`
+        INSERT INTO token_blacklist (token_jti, usuario_id, expires_at, created_at)
+        VALUES (?, ?, ?, NOW())
+        ON DUPLICATE KEY UPDATE
+        usuario_id = VALUES(usuario_id),
+        expires_at = VALUES(expires_at)
+      `, [jti, userId, expiresAt]);
 
     } catch (error) {
-      throw new Error(`Error agregando token a blacklist: ${error.message}`);
+      throw new Error(`Error añadiendo token a blacklist: ${error.message}`);
     }
   }
 
   /**
    * Verifica si un JWT está en la blacklist
-   * @param {string} token - JWT token
-   * @returns {Promise<boolean>} True si está en blacklist
    */
   async isJWTBlacklisted(token) {
     try {
       const decoded = jwt.decode(token);
-      if (!decoded) {
-        return true; // Token inválido se considera blacklisted
+      const jti = decoded?.jti;
+
+      if (!jti) {
+        return false;
       }
 
-      const jti = decoded.jti || crypto.createHash('sha256').update(token).digest('hex');
+      // Usar conexión directa para evitar problemas con el query builder
+      const { pool } = require('../config/db');
+      const [rows] = await pool.execute(
+        'SELECT 1 FROM token_blacklist WHERE token_jti = ? AND expires_at > NOW()',
+        [jti]
+      );
 
-      const query = `
-        SELECT id FROM token_blacklist 
-        WHERE token_jti = ? AND expires_at > NOW()
-      `;
-
-      const [rows] = await pool.execute(query, [jti]);
       return rows.length > 0;
 
     } catch (error) {
-      // En caso de error, considerar como blacklisted por seguridad
-      return true;
+      console.error('Error verificando blacklist:', error);
+      return false;
     }
   }
 
   /**
-   * Limpia tokens expirados (mantenimiento)
-   * @returns {Promise<Object>} Estadísticas de limpieza
+   * Limpia tokens expirados de la base de datos
    */
   async cleanExpiredTokens() {
     try {
+      // Usar conexión directa para evitar problemas con el query builder
+      const { pool } = require('../config/db');
+      
       // Limpiar refresh tokens expirados
-      const refreshQuery = `
-        DELETE FROM refresh_tokens 
-        WHERE expires_at < NOW() OR is_revoked = TRUE
-      `;
-      const [refreshResult] = await pool.execute(refreshQuery);
+      const [refreshResult] = await pool.execute(
+        'DELETE FROM refresh_tokens WHERE expires_at < NOW()'
+      );
 
-      // Limpiar blacklist expirada
-      const blacklistQuery = `
-        DELETE FROM token_blacklist 
-        WHERE expires_at < NOW()
-      `;
-      const [blacklistResult] = await pool.execute(blacklistQuery);
+      // Limpiar tokens blacklisteados expirados
+      const [blacklistResult] = await pool.execute(
+        'DELETE FROM token_blacklist WHERE expires_at < NOW()'
+      );
 
       return {
         refreshTokensDeleted: refreshResult.affectedRows,
-        blacklistEntriesDeleted: blacklistResult.affectedRows
+        blacklistedTokensDeleted: blacklistResult.affectedRows
       };
 
     } catch (error) {
@@ -212,53 +186,39 @@ class RefreshTokenService {
     }
   }
 
-  // Métodos privados
-
   /**
-   * Revoca todos los refresh tokens activos de un usuario
-   * @private
-   * @param {number} userId - ID del usuario
+   * Revoca todos los refresh tokens de un usuario (método interno)
    */
   async _revokeUserRefreshTokens(userId) {
     try {
-      const query = `
-        UPDATE refresh_tokens 
-        SET is_revoked = TRUE, updated_at = NOW()
-        WHERE usuario_id = ? AND is_revoked = FALSE AND expires_at > NOW()
-      `;
-
-      await pool.execute(query, [userId]);
+      // Usar conexión directa para evitar problemas con el query builder
+      const { pool } = require('../config/db');
+      await pool.execute(
+        'UPDATE refresh_tokens SET is_revoked = 1, updated_at = NOW() WHERE usuario_id = ?',
+        [userId]
+      );
 
     } catch (error) {
-      // No lanzar error aquí, es una operación de limpieza
-      console.warn(`Advertencia revocando tokens previos: ${error.message}`);
+      throw new Error(`Error revocando tokens del usuario: ${error.message}`);
     }
   }
 
   /**
-   * Obtiene estadísticas de tokens para un usuario
-   * @param {number} userId - ID del usuario
-   * @returns {Promise<Object>} Estadísticas de tokens
+   * Obtiene estadísticas de tokens de un usuario
    */
   async getUserTokenStats(userId) {
     try {
-      const query = `
-        SELECT 
-          COUNT(*) as total_tokens,
-          SUM(CASE WHEN is_revoked = FALSE AND expires_at > NOW() THEN 1 ELSE 0 END) as active_tokens,
-          SUM(CASE WHEN is_revoked = TRUE THEN 1 ELSE 0 END) as revoked_tokens,
-          SUM(CASE WHEN expires_at <= NOW() THEN 1 ELSE 0 END) as expired_tokens
-        FROM refresh_tokens 
-        WHERE usuario_id = ?
-      `;
+      // Obtener estadísticas usando query builder
+      const [stats] = await this.baseRepository.db('refresh_tokens')
+        .select(
+          this.baseRepository.db.raw('COUNT(*) as total'),
+          this.baseRepository.db.raw('SUM(CASE WHEN revoked = false AND expires_at > NOW() THEN 1 ELSE 0 END) as active'),
+          this.baseRepository.db.raw('SUM(CASE WHEN revoked = true THEN 1 ELSE 0 END) as revoked'),
+          this.baseRepository.db.raw('SUM(CASE WHEN expires_at <= NOW() THEN 1 ELSE 0 END) as expired')
+        )
+        .where('usuario_id', userId);
 
-      const [rows] = await pool.execute(query, [userId]);
-      return rows[0] || {
-        total_tokens: 0,
-        active_tokens: 0,
-        revoked_tokens: 0,
-        expired_tokens: 0
-      };
+      return stats;
 
     } catch (error) {
       throw new Error(`Error obteniendo estadísticas de tokens: ${error.message}`);

@@ -219,25 +219,24 @@ class ProjectRepository extends BaseRepository {
    * Actualiza un proyecto por ID
    */
   async updateById(id, projectData) {
-    const updateData = { ...projectData };
-    updateData.updated_at = new Date();
+    try {
+      const updateData = { ...projectData };
+      updateData.updated_at = new Date();
 
-    // Usar query SQL directa para evitar problemas con el query builder
-    const { pool } = require('../config/db');
-    
-    const fields = Object.keys(updateData);
-    const values = Object.values(updateData);
-    const setClause = fields.map(field => `${field} = ?`).join(', ');
-    
-    const query = `UPDATE ${this.tableName} SET ${setClause} WHERE id = ?`;
-    const [result] = await pool.execute(query, [...values, id]);
-    
-    if (result.affectedRows === 0) {
-      throw new Error('Proyecto no encontrado');
+      // Usar el query builder del BaseRepository correctamente
+      this.reset(); // Resetear el query builder
+      const result = await this.where('id', id).update(updateData);
+      
+      if (result === 0) {
+        throw new Error('Proyecto no encontrado');
+      }
+      
+      // Retornar el proyecto actualizado
+      return await this.findById(id);
+    } catch (error) {
+      console.error('Error en ProjectRepository.updateById:', error);
+      throw error;
     }
-    
-    // Retornar el proyecto actualizado
-    return await this.findById(id);
   }
 
   /**
@@ -280,6 +279,7 @@ class ProjectRepository extends BaseRepository {
    * Elimina un proyecto por ID
    */
   async deleteById(id) {
+    this.reset(); // Resetear el query builder
     return await this.where('id', id).delete();
   }
 
@@ -447,29 +447,31 @@ class ProjectRepository extends BaseRepository {
    * - Es responsable del proyecto
    */
   async hasUserAccess(projectId, userId) {
-    const { pool } = require('../config/db');
-    
-    // Verificar si es el creador
-    const [creatorCheck] = await pool.execute(`
-      SELECT 1 
-      FROM proyectos 
-      WHERE id = ? AND creado_por = ?
-      LIMIT 1
-    `, [projectId, userId]);
-    
-    if (creatorCheck && creatorCheck.length > 0) {
-      return true;
+    try {
+      // Verificar si es el creador
+      const creatorCheck = await this
+        .select('1')
+        .where('id', projectId)
+        .where('creado_por', userId)
+        .first();
+      
+      if (creatorCheck) {
+        return true;
+      }
+
+      // Verificar si es responsable del proyecto
+      const responsibleCheck = await this.db('proyecto_responsables')
+        .select('1')
+        .where('proyecto_id', projectId)
+        .where('usuario_id', userId)
+        .where('activo', true)
+        .first();
+
+      return !!responsibleCheck;
+    } catch (error) {
+      console.error('Error en ProjectRepository.hasUserAccess:', error);
+      return false;
     }
-
-    // Verificar si es responsable del proyecto
-    const [responsibleCheck] = await pool.execute(`
-      SELECT 1 
-      FROM proyecto_responsables 
-      WHERE proyecto_id = ? AND usuario_id = ? AND activo = TRUE
-      LIMIT 1
-    `, [projectId, userId]);
-
-    return responsibleCheck && responsibleCheck.length > 0;
   }
 }
 

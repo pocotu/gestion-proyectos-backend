@@ -289,17 +289,17 @@ class RoleService {
     try {
       console.log('getUserRoles - Iniciando con userId:', userId);
       
-      // Usar query SQL raw directa para verificar que el usuario existe
-      const { pool } = require('../config/db');
+      // Verificar que el usuario existe usando el repositorio
+      const user = await this.userRepository.db('usuarios')
+        .select('id', 'nombre', 'email')
+        .where('id', userId)
+        .where('estado', 'activo')
+        .first();
       
-      const userQuery = `SELECT id, nombre, email FROM usuarios WHERE id = ? AND estado = 'activo'`;
-      const [userResult] = await pool.execute(userQuery, [userId]);
-      
-      if (!userResult || userResult.length === 0) {
+      if (!user) {
         throw new Error('Usuario no encontrado');
       }
       
-      const user = userResult[0];
       console.log('getUserRoles - Usuario encontrado:', user.nombre);
 
       // Usar método estático para evitar cualquier conflicto de instanciación

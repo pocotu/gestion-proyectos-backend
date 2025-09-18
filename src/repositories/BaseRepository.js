@@ -287,10 +287,7 @@ class BaseRepository {
     const [result] = await pool.execute(query, [...values, ...this.params]);
     
     this.reset();
-    return {
-      affectedRows: result.affectedRows,
-      changedRows: result.changedRows
-    };
+    return result.affectedRows;
   }
 
   /**
@@ -305,9 +302,7 @@ class BaseRepository {
     const [result] = await pool.execute(query, this.params);
     
     this.reset();
-    return {
-      affectedRows: result.affectedRows
-    };
+    return result.affectedRows;
   }
 
   /**

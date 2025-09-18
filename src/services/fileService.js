@@ -1,7 +1,9 @@
 const FileRepository = require('../repositories/FileRepository');
+const config = require('../config/config');
 const path = require('path');
 const fs = require('fs').promises;
 const crypto = require('crypto');
+const multer = require('multer');
 
 /**
  * FileService - Servicio para gestión de archivos
@@ -15,12 +17,9 @@ const crypto = require('crypto');
 class FileService {
   constructor() {
     this.fileRepository = new FileRepository();
-    this.uploadPath = process.env.UPLOAD_PATH || './uploads';
-    this.maxFileSize = parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024; // 10MB por defecto
-    this.allowedExtensions = process.env.ALLOWED_EXTENSIONS?.split(',') || [
-      '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-      '.txt', '.jpg', '.jpeg', '.png', '.gif', '.zip', '.rar'
-    ];
+    this.uploadPath = config.UPLOAD_PATH;
+    this.maxFileSize = config.MAX_FILE_SIZE;
+    this.allowedExtensions = config.ALLOWED_EXTENSIONS;
   }
 
   /**

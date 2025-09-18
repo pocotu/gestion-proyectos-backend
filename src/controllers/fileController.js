@@ -1,4 +1,5 @@
 const FileService = require('../services/fileService');
+const config = require('../config/config');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
@@ -67,7 +68,7 @@ class FileController {
     this.upload = multer({
       storage: storage,
       limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB máximo
+        fileSize: config.MAX_FILE_SIZE,
         files: 5 // Máximo 5 archivos por request
       },
       fileFilter: fileFilter
@@ -112,7 +113,7 @@ class FileController {
             if (err.code === 'LIMIT_FILE_SIZE') {
               return res.status(400).json({
                 success: false,
-                message: 'El archivo es demasiado grande (máximo 10MB)'
+                message: `El archivo es demasiado grande (máximo ${Math.round(config.MAX_FILE_SIZE / (1024 * 1024))}MB)`
               });
             }
             if (err.code === 'LIMIT_FILE_COUNT') {

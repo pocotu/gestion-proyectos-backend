@@ -1,6 +1,7 @@
 const TaskRepository = require('../repositories/TaskRepository');
 const TaskAssignmentRepository = require('../repositories/TaskAssignmentRepository');
 const TaskCommentRepository = require('../repositories/TaskCommentRepository');
+const ProjectResponsibleRepository = require('../repositories/ProjectResponsibleRepository');
 
 /**
  * TaskService - Servicio para gestión de tareas
@@ -16,6 +17,7 @@ class TaskService {
     this.taskRepository = new TaskRepository();
     this.taskAssignmentRepository = new TaskAssignmentRepository();
     this.taskCommentRepository = new TaskCommentRepository();
+    this.projectResponsibleRepository = new ProjectResponsibleRepository();
   }
 
   /**
@@ -129,7 +131,7 @@ class TaskService {
         throw new Error('Tarea no encontrada');
       }
 
-      // Verificar acceso si no es admin
+      // Verificar acceso solo si no es admin
       if (!isAdmin) {
         const hasAccess = await this.taskRepository.hasUserAccess(id, userId);
         if (!hasAccess) {
@@ -145,7 +147,7 @@ class TaskService {
         }
       }
 
-      const updatedTask = await this.taskRepository.update(id, taskData);
+      const updatedTask = await this.taskRepository.updateTask(id, taskData);
       return updatedTask;
     } catch (error) {
       console.error('Error en TaskService.updateTask:', error);
@@ -214,7 +216,7 @@ class TaskService {
         throw new Error(`No se puede cambiar de ${task.estado} a ${newStatus}`);
       }
 
-      const updatedTask = await this.taskRepository.update(id, { estado: newStatus });
+      const updatedTask = await this.taskRepository.updateTask(id, { estado: newStatus });
       return updatedTask;
     } catch (error) {
       console.error('Error en TaskService.changeTaskStatus:', error);
@@ -574,7 +576,7 @@ class TaskService {
         throw new Error('Prioridad no válida');
       }
 
-      const updatedTask = await this.taskRepository.update(id, { prioridad: newPriority });
+      const updatedTask = await this.taskRepository.updateTask(id, { prioridad: newPriority });
       return updatedTask;
     } catch (error) {
       console.error('Error en TaskService.changeTaskPriority:', error);
@@ -630,17 +632,15 @@ class TaskService {
    */
   async userCanManageProject(userId, projectId) {
     try {
-      const { pool } = require('../config/db');
-      
-      // Verificar si es responsable del proyecto
-      const [result] = await pool.execute(`
-        SELECT 1 
-        FROM proyecto_responsables 
-        WHERE proyecto_id = ? AND usuario_id = ? AND activo = TRUE
-        LIMIT 1
-      `, [projectId, userId]);
+      // Verificar si es responsable del proyecto usando el repositorio
+      const result = await this.projectResponsibleRepository.db('proyecto_responsables')
+        .select('1')
+        .where('proyecto_id', projectId)
+        .where('usuario_id', userId)
+        .where('activo', true)
+        .first();
 
-      return result && result.length > 0;
+      return !!result;
     } catch (error) {
       console.error('Error en TaskService.userCanManageProject:', error);
       return false;

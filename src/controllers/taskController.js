@@ -128,22 +128,26 @@ class TaskController {
         titulo: titulo.trim(),
         descripcion: descripcion.trim(),
         fecha_inicio: fechaInicio,
-        fecha_fin: fechaFin,
-        fecha_limite: req.body.fecha_limite || null,
-        estimacion_horas: req.body.estimacion_horas || null,
+            fecha_fin: fechaFin,
         prioridad: prioridad || 'media',
         estado: 'pendiente',
         proyecto_id: parseInt(proyecto_id),
-        asignado_a: usuario_asignado_id ? parseInt(usuario_asignado_id) : null,
+        usuario_asignado_id: usuario_asignado_id ? parseInt(usuario_asignado_id) : null,
         creado_por
       };
 
-      const task = await this.taskService.createTask(taskData);
+      const result = await this.taskService.createTask(taskData, creado_por);
 
       res.status(201).json({
         success: true,
         message: 'Tarea creada exitosamente',
-        data: { task }
+        data: { 
+          task: {
+            id: result.insertId || result.id,
+            ...taskData,
+            creado_por
+          }
+        }
       });
 
     } catch (error) {

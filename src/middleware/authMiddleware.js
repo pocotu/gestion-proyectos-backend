@@ -1,5 +1,6 @@
 const AuthService = require('../services/authService');
 const RefreshTokenService = require('../services/RefreshTokenService');
+const config = require('../config/config');
 
 /**
  * AuthMiddleware - Middleware de autenticación JWT
@@ -227,54 +228,40 @@ class AuthMiddleware {
    * @param {number} maxRequests - Máximo número de requests
    * @param {number} windowMs - Ventana de tiempo en milisegundos
    */
-  rateLimitByUser(maxRequests = 100, windowMs = 15 * 60 * 1000) {
+  rateLimitByUser(maxRequests = config.USER_RATE_LIMIT_MAX_REQUESTS, windowMs = config.USER_RATE_LIMIT_WINDOW_MS) {
     const userRequests = new Map();
 
     return (req, res, next) => {
-      try {
-        if (!req.user) {
-          return res.status(401).json({
-            success: false,
-            message: 'Usuario no autenticado'
-          });
-        }
+      const userId = req.user?.id;
+      if (!userId) {
+        return next();
+      }
 
-        const userId = req.user.id;
-        const now = Date.now();
-        const windowStart = now - windowMs;
+      const now = Date.now();
+      const userKey = `user_${userId}`;
+      
+      if (!userRequests.has(userKey)) {
+        userRequests.set(userKey, { count: 1, resetTime: now + windowMs });
+        return next();
+      }
 
-        // Obtener requests del usuario
-        if (!userRequests.has(userId)) {
-          userRequests.set(userId, []);
-        }
+      const userLimit = userRequests.get(userKey);
+      
+      if (now > userLimit.resetTime) {
+        userRequests.set(userKey, { count: 1, resetTime: now + windowMs });
+        return next();
+      }
 
-        const requests = userRequests.get(userId);
-        
-        // Filtrar requests dentro de la ventana de tiempo
-        const recentRequests = requests.filter(time => time > windowStart);
-        
-        // Verificar límite
-        if (recentRequests.length >= maxRequests) {
-          return res.status(429).json({
-            success: false,
-            message: 'Demasiadas solicitudes. Intenta de nuevo más tarde'
-          });
-        }
-
-        // Agregar request actual
-        recentRequests.push(now);
-        userRequests.set(userId, recentRequests);
-
-        next();
-
-      } catch (error) {
-        console.error('Error en rate limiting:', error);
-
-        return res.status(500).json({
+      if (userLimit.count >= maxRequests) {
+        return res.status(429).json({
           success: false,
-          message: 'Error interno del servidor'
+          message: 'Too many requests from this user',
+          retryAfter: Math.ceil((userLimit.resetTime - now) / 1000)
         });
       }
+
+      userLimit.count++;
+      next();
     };
   }
 

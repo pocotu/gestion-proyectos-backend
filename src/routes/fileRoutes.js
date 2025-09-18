@@ -1,5 +1,6 @@
 const express = require('express');
 const FileController = require('../controllers/fileController');
+const config = require('../config/config');
 const { authenticate } = require('../middleware/authMiddleware');
 const { 
   requirePermission, 
@@ -214,21 +215,8 @@ router.post('/validate',
     }
 
     // Validaciones básicas
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    const allowedTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/plain',
-      'text/csv',
-      'application/zip',
-      'application/x-rar-compressed'
-    ];
+    const maxSize = config.MAX_FILE_SIZE;
+    const allowedTypes = config.ALLOWED_MIME_TYPES;
 
     const errors = [];
 

@@ -27,9 +27,7 @@ class TaskRepository extends BaseRepository {
       prioridad = 'media',
       fecha_inicio,
       fecha_fin,
-      fecha_limite,
-      estimacion_horas,
-      asignado_a,
+      usuario_asignado_id,
       creado_por,
       padre_tarea_id = null,
       porcentaje_completado = 0
@@ -37,7 +35,7 @@ class TaskRepository extends BaseRepository {
 
     // Validar estados y prioridades válidas
     const validStates = ['pendiente', 'en_progreso', 'en_revision', 'completada', 'cancelada'];
-    const validPriorities = ['baja', 'media', 'alta', 'critica'];
+    const validPriorities = ['baja', 'media', 'alta']; // Sincronizado con TaskController
 
     if (!validStates.includes(estado)) {
       throw new Error('Estado de tarea inválido');
@@ -59,7 +57,10 @@ class TaskRepository extends BaseRepository {
       prioridad,
       fecha_inicio,
       fecha_fin,
-      usuario_asignado_id: asignado_a || null,
+      usuario_asignado_id: usuario_asignado_id || null,
+      creado_por,
+      padre_tarea_id,
+      porcentaje_completado,
       created_at: new Date(),
       updated_at: new Date()
     });
@@ -93,50 +94,37 @@ class TaskRepository extends BaseRepository {
     console.log('TaskRepository.findAll - Iniciando con parámetros:', { limit, offset, filters, userId, isAdmin });
     
     try {
-      // Usar directamente el método get del BaseRepository sin query builder complejo
-      let sql = `SELECT * FROM ${this.tableName}`;
-      let params = [];
-      let whereConditions = [];
+      // Usar el query builder del BaseRepository
+      let query = this.select('*');
 
       // Aplicar filtros básicos
       if (filters.estado) {
-        whereConditions.push('estado = ?');
-        params.push(filters.estado);
+        query = query.where('estado', filters.estado);
       }
       
       if (filters.prioridad) {
-        whereConditions.push('prioridad = ?');
-        params.push(filters.prioridad);
+        query = query.where('prioridad', filters.prioridad);
       }
       
       if (filters.proyecto_id) {
-        whereConditions.push('proyecto_id = ?');
-        params.push(filters.proyecto_id);
+        query = query.where('proyecto_id', filters.proyecto_id);
       }
 
       // Si no es admin, filtrar por acceso del usuario
       if (!isAdmin && userId) {
-        whereConditions.push('(asignado_a = ? OR creado_por = ?)');
-        params.push(userId, userId);
+        query = query.where('usuario_asignado_id', userId);
       }
 
-      if (whereConditions.length > 0) {
-        sql += ' WHERE ' + whereConditions.join(' AND ');
-      }
-
-      sql += ' ORDER BY created_at DESC';
+      query = query.orderBy('created_at', 'DESC');
       
       if (limit) {
-        sql += ` LIMIT ${limit}`;
+        query = query.limit(limit);
         if (offset) {
-          sql += ` OFFSET ${offset}`;
+          query = query.offset(offset);
         }
       }
 
-      console.log('TaskRepository.findAll - SQL:', sql);
-      console.log('TaskRepository.findAll - Params:', params);
-
-      const [rows] = await pool.execute(sql, params);
+      const rows = await query.get();
 
       console.log('TaskRepository.findAll - Encontradas', rows.length, 'tareas');
       return rows;
@@ -153,42 +141,29 @@ class TaskRepository extends BaseRepository {
     console.log('TaskRepository.count - Iniciando con parámetros:', { filters, userId, isAdmin });
     
     try {
-      // Usar SQL directo para el count también
-      let sql = `SELECT COUNT(*) as total FROM ${this.tableName}`;
-      let params = [];
-      let whereConditions = [];
+      // Usar el query builder del BaseRepository para count
+      let query = this.select('COUNT(*) as total');
 
       // Aplicar filtros básicos
       if (filters.estado) {
-        whereConditions.push('estado = ?');
-        params.push(filters.estado);
+        query = query.where('estado', filters.estado);
       }
       
       if (filters.prioridad) {
-        whereConditions.push('prioridad = ?');
-        params.push(filters.prioridad);
+        query = query.where('prioridad', filters.prioridad);
       }
       
       if (filters.proyecto_id) {
-        whereConditions.push('proyecto_id = ?');
-        params.push(filters.proyecto_id);
+        query = query.where('proyecto_id', filters.proyecto_id);
       }
 
       // Si no es admin, filtrar por acceso del usuario
       if (!isAdmin && userId) {
-        whereConditions.push('(asignado_a = ? OR creado_por = ?)');
-        params.push(userId, userId);
+        query = query.where('usuario_asignado_id', userId);
       }
 
-      if (whereConditions.length > 0) {
-        sql += ' WHERE ' + whereConditions.join(' AND ');
-      }
-
-      console.log('TaskRepository.count - SQL:', sql);
-      console.log('TaskRepository.count - Params:', params);
-
-      const [rows] = await pool.execute(sql, params);
-      const total = rows[0]?.total || 0;
+      const result = await query.first();
+      const total = result?.total || 0;
 
       console.log('TaskRepository.count - Total encontrado:', total);
       return total;
@@ -219,7 +194,7 @@ class TaskRepository extends BaseRepository {
 
     return await query
       .orderBy('tareas.prioridad', 'DESC')
-      .orderBy('tareas.fecha_limite', 'ASC')
+      .orderBy('tareas.fecha_fin', 'ASC')
       .get();
   }
 
@@ -235,7 +210,7 @@ class TaskRepository extends BaseRepository {
       `)
       .join('proyectos', 'tareas.proyecto_id', 'proyectos.id')
       .leftJoin('usuarios as creador', 'tareas.creado_por', 'creador.id')
-      .where('tareas.asignado_a', usuario_id);
+      .where('tareas.usuario_asignado_id', usuario_id);
 
     if (estado) {
       query = query.where('tareas.estado', estado);
@@ -398,7 +373,7 @@ class TaskRepository extends BaseRepository {
         asignado.email as asignado_email
       `)
       .join('proyectos', 'tareas.proyecto_id', 'proyectos.id')
-      .leftJoin('usuarios as asignado', 'tareas.asignado_a', 'asignado.id')
+      .leftJoin('usuarios as asignado', 'tareas.usuario_asignado_id', 'asignado.id')
       .where('tareas.prioridad', prioridad);
 
     if (proyecto_id) {
@@ -422,8 +397,8 @@ class TaskRepository extends BaseRepository {
         asignado.email as asignado_email
       `)
       .join('proyectos', 'tareas.proyecto_id', 'proyectos.id')
-      .leftJoin('usuarios as asignado', 'tareas.asignado_a', 'asignado.id')
-      .where('tareas.fecha_limite', '<', new Date())
+      .leftJoin('usuarios as asignado', 'tareas.usuario_asignado_id', 'asignado.id')
+      .where('tareas.fecha_fin', '<', new Date())
       .whereNotIn('tareas.estado', ['completada', 'cancelada']);
 
     if (proyecto_id) {
@@ -450,8 +425,8 @@ class TaskRepository extends BaseRepository {
         asignado.email as asignado_email
       `)
       .join('proyectos', 'tareas.proyecto_id', 'proyectos.id')
-      .leftJoin('usuarios as asignado', 'tareas.asignado_a', 'asignado.id')
-      .whereBetween('tareas.fecha_limite', [new Date(), futureDate])
+      .leftJoin('usuarios as asignado', 'tareas.usuario_asignado_id', 'asignado.id')
+      .whereBetween('tareas.fecha_fin', [new Date(), futureDate])
       .whereNotIn('tareas.estado', ['completada', 'cancelada']);
 
     if (proyecto_id) {
@@ -487,7 +462,6 @@ class TaskRepository extends BaseRepository {
       SELECT 
         AVG(porcentaje_completado) as avg_completion,
         SUM(CASE WHEN estado = 'completada' THEN 1 ELSE 0 END) as completed_count,
-        SUM(estimacion_horas) as total_estimated_hours,
         SUM(horas_trabajadas) as total_worked_hours
       FROM tareas
       WHERE proyecto_id = ?
@@ -495,7 +469,7 @@ class TaskRepository extends BaseRepository {
 
     const overdueTasks = await this
       .where('proyecto_id', proyecto_id)
-      .where('fecha_limite', '<', new Date())
+      .where('fecha_fin', '<', new Date())
       .whereNotIn('estado', ['completada', 'cancelada'])
       .count();
 
@@ -511,7 +485,7 @@ class TaskRepository extends BaseRepository {
       }, {}),
       averageCompletion: completionStats[0]?.avg_completion || 0,
       completedTasks: completionStats[0]?.completed_count || 0,
-      totalEstimatedHours: completionStats[0]?.total_estimated_hours || 0,
+      totalEstimatedHours: 0, // Campo removido de la base de datos
       totalWorkedHours: completionStats[0]?.total_worked_hours || 0,
       overdueTasks
     };
@@ -521,27 +495,26 @@ class TaskRepository extends BaseRepository {
    * Obtiene estadísticas de tareas de un usuario
    */
   async getUserTaskStats(usuario_id) {
-    const totalAssigned = await this.where('asignado_a', usuario_id).count();
+    const totalAssigned = await this.where('usuario_asignado_id', usuario_id).count();
     
     const byStatus = await this.raw(`
       SELECT estado, COUNT(*) as count
       FROM tareas
-      WHERE asignado_a = ?
+      WHERE usuario_asignado_id = ?
       GROUP BY estado
     `, [usuario_id]);
 
     const workloadStats = await this.raw(`
       SELECT 
-        SUM(estimacion_horas) as total_estimated_hours,
         SUM(horas_trabajadas) as total_worked_hours,
         AVG(porcentaje_completado) as avg_completion
       FROM tareas
-      WHERE asignado_a = ? AND estado NOT IN ('completada', 'cancelada')
+      WHERE usuario_asignado_id = ? AND estado NOT IN ('completada', 'cancelada')
     `, [usuario_id]);
 
     const overdueTasks = await this
-      .where('asignado_a', usuario_id)
-      .where('fecha_limite', '<', new Date())
+      .where('usuario_asignado_id', usuario_id)
+      .where('fecha_fin', '<', new Date())
       .whereNotIn('estado', ['completada', 'cancelada'])
       .count();
 
@@ -551,7 +524,7 @@ class TaskRepository extends BaseRepository {
         acc[item.estado] = item.count;
         return acc;
       }, {}),
-      totalEstimatedHours: workloadStats[0]?.total_estimated_hours || 0,
+      totalEstimatedHours: 0, // Campo removido de la base de datos
       totalWorkedHours: workloadStats[0]?.total_worked_hours || 0,
       averageCompletion: workloadStats[0]?.avg_completion || 0,
       overdueTasks
@@ -570,7 +543,7 @@ class TaskRepository extends BaseRepository {
         asignado.email as asignado_email
       `)
       .join('proyectos', 'tareas.proyecto_id', 'proyectos.id')
-      .leftJoin('usuarios as asignado', 'tareas.asignado_a', 'asignado.id')
+      .leftJoin('usuarios as asignado', 'tareas.usuario_asignado_id', 'asignado.id')
       .where(function() {
         this.where('tareas.titulo', 'LIKE', `%${searchTerm}%`)
             .orWhere('tareas.descripcion', 'LIKE', `%${searchTerm}%`);
@@ -632,7 +605,6 @@ class TaskRepository extends BaseRepository {
         COUNT(*) as total_tasks,
         SUM(CASE WHEN estado = 'completada' THEN 1 ELSE 0 END) as completed_tasks,
         AVG(porcentaje_completado) as avg_completion,
-        SUM(estimacion_horas) as total_estimated_hours,
         SUM(horas_trabajadas) as total_worked_hours
       FROM tareas
       WHERE proyecto_id = ?
@@ -648,11 +620,9 @@ class TaskRepository extends BaseRepository {
       completedTasks: stats.completed_tasks,
       completionPercentage: Math.round(completionPercentage * 100) / 100,
       averageTaskCompletion: Math.round(stats.avg_completion * 100) / 100,
-      totalEstimatedHours: stats.total_estimated_hours || 0,
+      totalEstimatedHours: 0, // Campo removido de la base de datos
       totalWorkedHours: stats.total_worked_hours || 0,
-      hoursEfficiency: stats.total_estimated_hours > 0 
-        ? Math.round((stats.total_worked_hours / stats.total_estimated_hours) * 100 * 100) / 100
-        : 0
+      hoursEfficiency: 0 // Sin horas estimadas, no se puede calcular eficiencia
     };
   }
 
@@ -664,7 +634,10 @@ class TaskRepository extends BaseRepository {
       throw new Error('Se requiere un array de IDs de tareas');
     }
 
-    const allowedFields = ['estado', 'prioridad', 'usuario_asignado_id', 'fecha_limite', 'porcentaje_completado'];
+    const allowedFields = [
+      'titulo', 'descripcion', 'estado', 'prioridad', 'fecha_inicio', 'fecha_fin',
+      'usuario_asignado_id', 'padre_tarea_id', 'porcentaje_completado'
+    ];
     const filteredData = {};
     
     Object.keys(updateData).forEach(key => {
@@ -695,6 +668,7 @@ class TaskRepository extends BaseRepository {
    * Eliminar tarea por ID
    */
   async deleteById(id) {
+    this.reset(); // Resetear el query builder
     return await this.where('id', id).delete();
   }
 
@@ -704,12 +678,9 @@ class TaskRepository extends BaseRepository {
   async projectExists(proyecto_id) {
     try {
       console.log('Verificando existencia del proyecto:', proyecto_id);
-      const [result] = await pool.execute(
-        'SELECT 1 FROM proyectos WHERE id = ? LIMIT 1',
-        [proyecto_id]
-      );
+      const result = await this.raw('SELECT 1 FROM proyectos WHERE id = ? LIMIT 1', [proyecto_id]);
       console.log('Resultado de la consulta:', result);
-      const exists = result && result.length > 0;
+      const exists = result.length > 0;
       console.log('Proyecto existe:', exists);
       return exists;
     } catch (error) {
@@ -726,119 +697,64 @@ class TaskRepository extends BaseRepository {
    * - Es responsable del proyecto al que pertenece la tarea
    */
   async hasUserAccess(taskId, userId) {
-    const { pool } = require('../config/db');
-    
-    // Verificar si es el usuario asignado o el creador
-    const [taskCheck] = await pool.execute(`
-      SELECT 1 
-      FROM tareas 
-      WHERE id = ? AND (usuario_asignado_id = ? OR creado_por = ?)
-      LIMIT 1
-    `, [taskId, userId, userId]);
-    
-    if (taskCheck && taskCheck.length > 0) {
-      return true;
-    }
-
-    // Verificar si es responsable del proyecto
-    const [projectCheck] = await pool.execute(`
-      SELECT 1 
-      FROM tareas t
-      JOIN proyecto_responsables pr ON t.proyecto_id = pr.proyecto_id
-      WHERE t.id = ? AND pr.usuario_id = ? AND pr.activo = TRUE
-      LIMIT 1
-    `, [taskId, userId]);
-
-    return projectCheck && projectCheck.length > 0;
-  }
-
-  /**
-   * Verifica si un proyecto existe
-   */
-  async projectExists(projectId) {
-    const { pool } = require('../config/db');
-    
-    const [result] = await pool.execute(`
-      SELECT 1 
-      FROM proyectos 
-      WHERE id = ?
-      LIMIT 1
-    `, [projectId]);
-
-    return result && result.length > 0;
-  }
-
-  /**
-   * Actualizar una tarea por ID
-   */
-  async update(id, taskData) {
     try {
-      const updateData = { ...taskData };
-      updateData.updated_at = new Date();
-  
-      // Usar query SQL directa para evitar problemas con el query builder
-      const { pool } = require('../config/db');
+      // Verificar si es el usuario asignado o el creador
+      const taskCheck = await this.raw(
+        'SELECT 1 FROM tareas WHERE id = ? AND (usuario_asignado_id = ? OR creado_por = ?) LIMIT 1',
+        [taskId, userId, userId]
+      );
       
-      const fields = Object.keys(updateData);
-      const values = Object.values(updateData);
-      const setClause = fields.map(field => `${field} = ?`).join(', ');
-      
-      const query = `UPDATE ${this.tableName} SET ${setClause} WHERE id = ?`;
-      const [result] = await pool.execute(query, [...values, id]);
-      
-      if (result.affectedRows === 0) {
-        throw new Error('Tarea no encontrada');
+      if (taskCheck.length > 0) {
+        return true;
       }
-      
-      // Retornar la tarea actualizada
-      return await this.findById(id);
-    } catch (error) {
-      console.error('Error en TaskRepository.update:', error);
-      throw error;
-    }
-  }
 
-  /**
-   * Verificar si un usuario tiene acceso a una tarea
-   * Un usuario tiene acceso si:
-   * - Es el usuario asignado a la tarea
-   * - Es el creador de la tarea
-   * - Es responsable del proyecto al que pertenece la tarea
-   */
-  async hasUserAccess(taskId, userId) {
-    try {
-      const query = `
-        SELECT 1 
-        FROM tareas t
-        LEFT JOIN proyecto_responsables pr ON t.proyecto_id = pr.proyecto_id
-        WHERE t.id = ? 
-        AND (
-          t.usuario_asignado_id = ? 
-          OR t.creado_por = ?
-          OR (pr.usuario_id = ? AND pr.activo = TRUE)
-        )
-        LIMIT 1
-      `;
-      
-      const [result] = await pool.execute(query, [taskId, userId, userId, userId]);
-      return result && result.length > 0;
+      // Verificar si es responsable del proyecto
+      const projectCheck = await this.raw(
+        `SELECT 1 FROM tareas t 
+         JOIN proyecto_responsables pr ON t.proyecto_id = pr.proyecto_id 
+         WHERE t.id = ? AND pr.usuario_id = ? AND pr.activo = 1 LIMIT 1`,
+        [taskId, userId]
+      );
+
+      return projectCheck.length > 0;
     } catch (error) {
       console.error('Error en TaskRepository.hasUserAccess:', error);
       return false;
     }
   }
 
+
+
   /**
-   * Verificar si un proyecto existe
+   * Actualizar una tarea por ID
    */
-  async projectExists(projectId) {
+  async updateTask(id, taskData) {
     try {
-      const query = `SELECT 1 FROM proyectos WHERE id = ? LIMIT 1`;
-      const [result] = await pool.execute(query, [projectId]);
-      return result && result.length > 0;
+      console.log('TaskRepository.updateTask - Iniciando actualización:', { id, taskData });
+      
+      const updateData = { ...taskData };
+      updateData.updated_at = new Date();
+      
+      console.log('TaskRepository.updateTask - Datos a actualizar:', updateData);
+  
+      // Usar el query builder del BaseRepository correctamente
+      this.reset(); // Resetear el query builder
+      const result = await this.where('id', id).update(updateData);
+      
+      console.log('TaskRepository.updateTask - Resultado de update:', result);
+      
+      if (result === 0) {
+        throw new Error('Tarea no encontrada');
+      }
+      
+      // Retornar la tarea actualizada
+      const updatedTask = await this.findById(id);
+      console.log('TaskRepository.updateTask - Tarea actualizada obtenida:', updatedTask);
+      
+      return updatedTask;
     } catch (error) {
-      console.error('Error en TaskRepository.projectExists:', error);
-      return false;
+      console.error('Error en TaskRepository.updateTask:', error);
+      throw error;
     }
   }
 }

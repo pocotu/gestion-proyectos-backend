@@ -12,17 +12,15 @@ class TaskModel {
         prioridad ENUM('baja','media','alta','critica') DEFAULT 'media',
         fecha_inicio DATE,
         fecha_fin DATE,
-        fecha_limite DATE,
-        estimacion_horas DECIMAL(5,2),
         horas_trabajadas DECIMAL(5,2) DEFAULT 0,
-        asignado_a INT,
+        usuario_asignado_id INT,
         creado_por INT,
         padre_tarea_id INT DEFAULT NULL,
         porcentaje_completado TINYINT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE,
-        FOREIGN KEY (asignado_a) REFERENCES usuarios(id) ON DELETE SET NULL,
+        FOREIGN KEY (usuario_asignado_id) REFERENCES usuarios(id) ON DELETE SET NULL,
         FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
         FOREIGN KEY (padre_tarea_id) REFERENCES tareas(id) ON DELETE SET NULL,
         CHECK (porcentaje_completado >= 0 AND porcentaje_completado <= 100)
@@ -39,23 +37,21 @@ class TaskModel {
     prioridad = 'media',
     fecha_inicio,
     fecha_fin,
-    fecha_limite,
-    estimacion_horas,
-    asignado_a,
+    usuario_asignado_id,
     creado_por,
     padre_tarea_id = null
   }) {
     const sql = `
       INSERT INTO tareas (
         proyecto_id, titulo, descripcion, estado, prioridad, 
-        fecha_inicio, fecha_fin, fecha_limite, estimacion_horas, 
-        asignado_a, creado_por, padre_tarea_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        fecha_inicio, fecha_fin, 
+        usuario_asignado_id, creado_por, padre_tarea_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await pool.execute(sql, [
       proyecto_id, titulo, descripcion || null, estado, prioridad,
-      fecha_inicio || null, fecha_fin || null, fecha_limite || null, 
-      estimacion_horas || null, asignado_a || null, creado_por || null, padre_tarea_id
+      fecha_inicio || null, fecha_fin || null, 
+      usuario_asignado_id || null, creado_por || null, padre_tarea_id
     ]);
     return { id: result.insertId };
   }
@@ -67,7 +63,7 @@ class TaskModel {
              u2.nombre as creador_nombre,
              p.titulo as proyecto_titulo
       FROM tareas t
-      LEFT JOIN usuarios u1 ON t.asignado_a = u1.id
+      LEFT JOIN usuarios u1 ON t.usuario_asignado_id = u1.id
       LEFT JOIN usuarios u2 ON t.creado_por = u2.id
       LEFT JOIN proyectos p ON t.proyecto_id = p.id
       WHERE t.id = ?
@@ -82,10 +78,10 @@ class TaskModel {
              u1.nombre as asignado_nombre,
              u2.nombre as creador_nombre
       FROM tareas t
-      LEFT JOIN usuarios u1 ON t.asignado_a = u1.id
+      LEFT JOIN usuarios u1 ON t.usuario_asignado_id = u1.id
       LEFT JOIN usuarios u2 ON t.creado_por = u2.id
       WHERE t.proyecto_id = ?
-      ORDER BY t.prioridad DESC, t.fecha_limite ASC
+      ORDER BY t.prioridad DESC, t.fecha_fin ASC
     `;
     const [rows] = await pool.execute(sql, [proyecto_id]);
     return rows;
@@ -99,8 +95,8 @@ class TaskModel {
       FROM tareas t
       LEFT JOIN proyectos p ON t.proyecto_id = p.id
       LEFT JOIN usuarios u ON t.creado_por = u.id
-      WHERE t.asignado_a = ?
-      ORDER BY t.prioridad DESC, t.fecha_limite ASC
+      WHERE t.usuario_asignado_id = ?
+      ORDER BY t.prioridad DESC, t.fecha_fin ASC
     `;
     const [rows] = await pool.execute(sql, [usuario_id]);
     return rows;
@@ -134,7 +130,7 @@ class TaskModel {
              u1.nombre as asignado_nombre,
              u2.nombre as creador_nombre
       FROM tareas t
-      LEFT JOIN usuarios u1 ON t.asignado_a = u1.id
+      LEFT JOIN usuarios u1 ON t.usuario_asignado_id = u1.id
       LEFT JOIN usuarios u2 ON t.creado_por = u2.id
       WHERE t.padre_tarea_id = ?
       ORDER BY t.created_at ASC

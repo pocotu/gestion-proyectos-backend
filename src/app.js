@@ -2,13 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config();
+const compression = require('compression');
+const morgan = require('morgan');
 
-const requestLogger = require('./middleware/requestLogger');
-const errorHandler = require('./middleware/errorHandler');
+// Configuration and database
+const { connectDB } = require('./config/db');
 const logger = require('./config/logger');
+const config = require('./config/config');
 
-// Importar rutas
+// Routes
 const authRoutes = require('./routes/authRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const auditRoutes = require('./routes/auditRoutes');
@@ -19,28 +21,46 @@ const fileRoutes = require('./routes/fileRoutes');
 
 const app = express();
 
-// Middleware de seguridad
+// Security middleware
 app.use(helmet());
 app.use(cors());
 
-// Rate limiting
+// Rate limiting - configurable via environment variables
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100
+  windowMs: config.RATE_LIMIT_WINDOW_MS,
+  max: config.RATE_LIMIT_MAX_REQUESTS,
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+    retryAfter: Math.ceil(config.RATE_LIMIT_WINDOW_MS / 1000)
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
+
 app.use(limiter);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Compression and parsing middleware
+app.use(compression());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request logging (keeps minimal footprint)
-app.use(requestLogger);
+// Request logging
+app.use(morgan('combined', {
+  stream: {
+    write: (message) => logger.info(message.trim())
+  }
+}));
 
+// Root endpoint
 app.get('/', (req, res) => {
-  res.json({ message: 'gestion-proyectos-backend scaffold', status: 'ok' });
+  res.json({
+    message: 'API de Gestión de Proyectos',
+    version: '1.0.0',
+    status: 'active'
+  });
 });
 
-// Configurar rutas
+// Routes configuration
 app.use('/api/auth', authRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/audit', auditRoutes);
@@ -49,10 +69,23 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/files', fileRoutes);
 
-// Global error handler (last middleware)
-app.use(errorHandler);
+// Global error handler
+app.use((err, req, res, next) => {
+  logger.error('Unhandled error:', err);
+  
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
 
-// expose logger for health checks if needed
-app.locals.logger = logger;
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
+  });
+});
 
 module.exports = app;

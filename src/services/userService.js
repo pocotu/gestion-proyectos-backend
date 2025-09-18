@@ -1,4 +1,5 @@
 const UserRepository = require('../repositories/UserRepository');
+const config = require('../config/config');
 const bcrypt = require('bcrypt');
 
 /**
@@ -22,7 +23,7 @@ class UserService {
     try {
       console.log('UserService.getAllUsers - Iniciando con:', options);
       
-      const { page = 1, limit = 10, filters = {} } = options;
+      const { page = 1, limit = config.DEFAULT_PAGINATION_LIMIT, filters = {} } = options;
       const offset = (page - 1) * limit;
       const repositoryOptions = { limit, offset, filters };
 
@@ -80,7 +81,7 @@ class UserService {
       }
 
       // Cifrar contraseña
-      const hashedPassword = await bcrypt.hash(userData.contraseña, 10);
+      const hashedPassword = await bcrypt.hash(userData.contraseña, config.BCRYPT_SALT_ROUNDS);
 
       const newUser = await this.userRepository.create({
         ...userData,
@@ -114,10 +115,10 @@ class UserService {
 
       // Si se está actualizando la contraseña, cifrarla
       if (userData.contraseña) {
-        userData.contraseña = await bcrypt.hash(userData.contraseña, 10);
+        userData.contraseña = await bcrypt.hash(userData.contraseña, config.BCRYPT_SALT_ROUNDS);
       }
 
-      const updatedUser = await this.userRepository.update(id, userData);
+      const updatedUser = await this.userRepository.updateById(id, userData);
       return this.sanitizeUser(updatedUser);
     } catch (error) {
       console.error('Error en UserService.updateUser:', error);
@@ -174,7 +175,7 @@ class UserService {
       delete profileData.email;
       delete profileData.es_administrador;
 
-      const updatedUser = await this.userRepository.update(userId, profileData);
+      const updatedUser = await this.userRepository.updateById(userId, profileData);
       return this.sanitizeUser(updatedUser);
     } catch (error) {
       console.error('Error en UserService.updateProfile:', error);
@@ -199,9 +200,9 @@ class UserService {
       }
 
       // Cifrar nueva contraseña
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      const hashedPassword = await bcrypt.hash(newPassword, config.BCRYPT_SALT_ROUNDS);
 
-      await this.userRepository.update(userId, { contraseña: hashedPassword });
+      await this.userRepository.updateById(userId, { contraseña: hashedPassword });
       return { message: 'Contraseña actualizada correctamente' };
     } catch (error) {
       console.error('Error en UserService.changePassword:', error);
@@ -212,7 +213,7 @@ class UserService {
   /**
    * Buscar usuarios
    */
-  async searchUsers(query, { page = 1, limit = 10 }) {
+  async searchUsers(query, { page = 1, limit = config.DEFAULT_PAGINATION_LIMIT }) {
     try {
       const offset = (page - 1) * limit;
       

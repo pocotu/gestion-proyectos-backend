@@ -428,31 +428,41 @@ class ProjectService {
   }
 
   /**
-   * Obtener proyectos donde participo
+   * Verificar si un usuario puede gestionar un proyecto
+   * Un usuario puede gestionar un proyecto si:
+   * - Es administrador
+   * - Es responsable del proyecto
    */
-  async getParticipatingProjects(userId, { page = 1, limit = 10 }) {
+  async userCanManageProject(userId, projectId) {
     try {
-      const offset = (page - 1) * limit;
-      
-      const projects = await this.projectRepository.findByParticipant(userId, {
-        limit,
-        offset
-      });
+      // Verificar si es responsable del proyecto usando el repositorio
+      const result = await this.projectResponsibleRepository.db('proyecto_responsables')
+        .select('1')
+        .where('proyecto_id', projectId)
+        .where('usuario_id', userId)
+        .where('activo', true)
+        .first();
 
-      const total = await this.projectRepository.countByParticipant(userId);
-
-      return {
-        projects,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
-        }
-      };
+      return !!result;
     } catch (error) {
-      console.error('Error en ProjectService.getParticipatingProjects:', error);
-      throw new Error('Error obteniendo proyectos donde participo');
+      console.error('Error en ProjectService.userCanManageProject:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Verificar si un usuario tiene acceso a un proyecto
+   * Un usuario tiene acceso si:
+   * - Es administrador
+   * - Es responsable del proyecto
+   * - Tiene tareas asignadas en el proyecto
+   */
+  async userHasAccessToProject(userId, projectId) {
+    try {
+      return await this.projectRepository.hasUserAccess(projectId, userId);
+    } catch (error) {
+      console.error('Error en ProjectService.userHasAccessToProject:', error);
+      return false;
     }
   }
 }

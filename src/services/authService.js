@@ -1,8 +1,8 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 const UserRepository = require('../repositories/UserRepository');
 const RefreshTokenService = require('./RefreshTokenService');
 const config = require('../config/config');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 /**
  * AuthService - Servicio de autenticación
@@ -10,14 +10,14 @@ const config = require('../config/config');
  * - Single Responsibility: Solo maneja lógica de autenticación
  * - Open/Closed: Abierto para extensión (nuevos métodos de auth)
  * - Liskov Substitution: Puede ser sustituido por otros servicios de auth
- * - Interface Segregation: Métodos específicos para autenticación
+ * - Interface Segregation: Métodos específicos para cada operación
  * - Dependency Inversion: Depende de abstracciones (UserRepository)
  */
 class AuthService {
   constructor() {
     this.userRepository = new UserRepository();
     this.refreshTokenService = new RefreshTokenService();
-    this.saltRounds = 12;
+    this.saltRounds = config.BCRYPT_SALT_ROUNDS;
   }
 
   /**

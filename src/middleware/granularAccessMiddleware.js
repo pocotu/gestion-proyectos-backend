@@ -64,7 +64,7 @@ class GranularAccessMiddleware {
         }
 
         // Verificar si el usuario es responsable del proyecto específico
-        const isResponsible = await this.projectResponsibleRepository.isUserResponsible(userId, parseInt(projectId));
+        const isResponsible = await this.projectResponsibleRepository.isUserResponsible(parseInt(projectId), userId);
         
         if (!isResponsible) {
           return res.status(403).json({
