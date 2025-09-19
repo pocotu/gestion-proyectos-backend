@@ -87,8 +87,14 @@ class TestConfig {
           create: '/api/projects',
           update: '/api/projects/:id',
           delete: '/api/projects/:id',
+          detail: '/api/projects/:id',
           members: '/api/projects/:id/members',
-          tasks: '/api/projects/:id/tasks'
+          tasks: '/api/projects/:id/tasks',
+          responsible: '/api/projects/:id/responsibles',
+          responsibles: '/api/projects/:id/responsibles',
+          stats: '/api/projects/:id/stats',
+          my: '/api/projects/my-projects',
+          search: '/api/projects/search'
         },
         tasks: {
           base: '/api/tasks',

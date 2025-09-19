@@ -127,22 +127,31 @@ class AuthService {
    */
   async verifyToken(token) {
     try {
+      console.log('🔐 [AUTH-SERVICE] Verificando token...');
+      console.log('🔐 [AUTH-SERVICE] JWT_SECRET:', config.JWT_SECRET ? 'Presente' : 'Ausente');
+      
       // Verificar y decodificar el token
       const decoded = jwt.verify(token, config.JWT_SECRET);
+      console.log('🔐 [AUTH-SERVICE] Token decodificado:', { id: decoded.id, email: decoded.email, es_administrador: decoded.es_administrador });
       
       // Buscar el usuario en la base de datos usando id (no userId)
       const user = await this.userRepository.findById(decoded.id);
+      console.log('🔐 [AUTH-SERVICE] Usuario encontrado:', user ? { id: user.id, email: user.email, es_administrador: user.es_administrador, estado: user.estado } : 'No encontrado');
       
       if (!user) {
+        console.log('🔐 [AUTH-SERVICE] Error: Usuario no encontrado');
         throw new Error('Usuario no encontrado');
       }
 
       if (user.estado !== 1) {
+        console.log('🔐 [AUTH-SERVICE] Error: Usuario no válido, estado:', user.estado);
         throw new Error('Usuario no válido');
       }
 
+      console.log('🔐 [AUTH-SERVICE] Usuario verificado exitosamente');
       return user;
     } catch (error) {
+      console.log('🔐 [AUTH-SERVICE] Error verificando token:', error.message);
       if (error.name === 'JsonWebTokenError') {
         throw new Error('Token inválido');
       } else if (error.name === 'TokenExpiredError') {

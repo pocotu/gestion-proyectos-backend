@@ -32,6 +32,27 @@ router.get('/',
   projectController.getAllProjects.bind(projectController)
 );
 
+// Obtener mis proyectos (proyectos donde soy responsable)
+// GET /api/projects/my
+// Permisos: Usuario autenticado (sus propios proyectos)
+router.get('/my', 
+  projectController.getMyProjects.bind(projectController)
+);
+
+// Obtener mis proyectos (proyectos donde soy responsable) - alias
+// GET /api/projects/my-projects
+// Permisos: Usuario autenticado (sus propios proyectos)
+router.get('/my-projects', 
+  projectController.getMyProjects.bind(projectController)
+);
+
+// Obtener proyectos donde participo
+// GET /api/projects/participating
+// Permisos: Usuario autenticado (proyectos donde participa)
+router.get('/participating', 
+  projectController.getParticipatingProjects.bind(projectController)
+);
+
 // Crear nuevo proyecto
 // POST /api/projects
 // Permisos: Solo responsables de proyecto y admin
@@ -176,9 +197,9 @@ router.get('/:id/progress',
  * Rutas de búsqueda y filtrado
  */
 
-// Buscar proyectos
-// GET /api/projects/search
-// Permisos: Filtrado según acceso del usuario
+// Buscar proyectos por término
+// GET /api/projects/search?q=termino&page=1&limit=10
+// Permisos: Usuario autenticado (solo ve proyectos a los que tiene acceso)
 router.get('/search', 
   projectController.searchProjects.bind(projectController)
 );
@@ -188,24 +209,6 @@ router.get('/search',
 // Permisos: Filtrado según acceso del usuario
 router.get('/by-status/:status', 
   projectController.getProjectsByStatus.bind(projectController)
-);
-
-/**
- * Rutas específicas para responsables
- */
-
-// Obtener mis proyectos (proyectos donde soy responsable)
-// GET /api/projects/my-projects
-// Permisos: Usuario autenticado (sus propios proyectos)
-router.get('/my-projects', 
-  projectController.getMyProjects.bind(projectController)
-);
-
-// Obtener proyectos donde participo
-// GET /api/projects/participating
-// Permisos: Usuario autenticado (proyectos donde participa)
-router.get('/participating', 
-  projectController.getParticipatingProjects.bind(projectController)
 );
 
 /**

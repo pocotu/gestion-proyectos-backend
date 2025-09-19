@@ -776,7 +776,9 @@ class TaskRepository extends BaseRepository {
       const [total] = await pool.execute(baseQuery + whereClause, params);
       const [pendientes] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'pendiente']);
       const [en_progreso] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'en_progreso']);
+      const [en_revision] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'en_revision']);
       const [completadas] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'completada']);
+      const [canceladas] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'cancelada']);
       const [alta] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' prioridad = ?', [...params, 'alta']);
       const [media] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' prioridad = ?', [...params, 'media']);
       const [baja] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' prioridad = ?', [...params, 'baja']);
@@ -785,7 +787,9 @@ class TaskRepository extends BaseRepository {
         total: parseInt(total[0].count) || 0,
         pendientes: parseInt(pendientes[0].count) || 0,
         en_progreso: parseInt(en_progreso[0].count) || 0,
+        en_revision: parseInt(en_revision[0].count) || 0,
         completadas: parseInt(completadas[0].count) || 0,
+        canceladas: parseInt(canceladas[0].count) || 0,
         alta: parseInt(alta[0].count) || 0,
         media: parseInt(media[0].count) || 0,
         baja: parseInt(baja[0].count) || 0
@@ -816,13 +820,15 @@ class TaskRepository extends BaseRepository {
       const [en_progreso] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'en_progreso']);
       const [en_revision] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'en_revision']);
       const [completadas] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'completada']);
+      const [canceladas] = await pool.execute(baseQuery + whereClause + (whereClause ? ' AND' : ' WHERE') + ' estado = ?', [...params, 'cancelada']);
 
       return {
         total: parseInt(total[0].count) || 0,
         pendientes: parseInt(pendientes[0].count) || 0,
         en_progreso: parseInt(en_progreso[0].count) || 0,
         en_revision: parseInt(en_revision[0].count) || 0,
-        completadas: parseInt(completadas[0].count) || 0
+        completadas: parseInt(completadas[0].count) || 0,
+        canceladas: parseInt(canceladas[0].count) || 0
       };
     } catch (error) {
       console.error('Error en TaskRepository.getOverviewStats:', error);

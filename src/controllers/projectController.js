@@ -428,6 +428,15 @@ class ProjectController {
         });
       }
 
+      // Validar que el usuario existe
+      const userExists = await this.projectService.userRepository.findById(responsibleUserId);
+      if (!userExists) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado'
+        });
+      }
+
       // Verificar permisos
       if (!isAdmin) {
         const canManage = await this.projectService.userCanManageProject(assignedBy, projectId);
@@ -454,6 +463,13 @@ class ProjectController {
     } catch (error) {
       console.error('Error asignando responsable:', error);
       
+      if (error.message.includes('ya es responsable')) {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+
       if (error.message.includes('no encontrado')) {
         return res.status(404).json({
           success: false,
@@ -574,7 +590,7 @@ class ProjectController {
         }
       }
 
-      const stats = await this.projectService.getProjectStatistics(projectId);
+      const stats = await this.projectService.getProjectStats(projectId, userId, isAdmin);
 
       res.json({
         success: true,
@@ -739,12 +755,28 @@ class ProjectController {
    */
   async searchProjects(req, res) {
     try {
-      const { query, limit = 10, offset = 0 } = req.query;
-      const projects = await this.projectService.searchProjects(query, { limit, offset });
+      const { q: query, limit = 10, offset = 0, page = 1 } = req.query;
+      
+      if (!query || query.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'El parámetro de búsqueda "q" es requerido'
+        });
+      }
+
+      const userId = req.user.id;
+      const isAdmin = req.user.permissions?.includes('admin') || false;
+      
+      const result = await this.projectService.search(query.trim(), {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        userId,
+        isAdmin
+      });
 
       res.json({
         success: true,
-        data: { projects }
+        data: result
       });
 
     } catch (error) {
@@ -785,19 +817,38 @@ class ProjectController {
    */
   async getMyProjects(req, res) {
     try {
+      console.log('🔍 [CONTROLLER] getMyProjects - req.user:', req.user);
+      
       const userId = req.user.id;
-      const projects = await this.projectService.getUserProjects(userId);
+      const { page = 1, limit = 10 } = req.query;
+
+      // Para administradores, no verificar permisos específicos
+      if (!req.user.es_administrador) {
+        console.log('🔍 [CONTROLLER] getMyProjects - Usuario no es administrador, verificando permisos');
+        // Aquí podrías agregar verificación de permisos específicos si es necesario
+        // Por ahora, permitimos que cualquier usuario vea sus proyectos asignados
+      }
+
+      console.log('🔍 [CONTROLLER] getMyProjects - Llamando a projectService.getUserProjects');
+      
+      const result = await this.projectService.getUserProjects(userId, {
+        page: parseInt(page),
+        limit: parseInt(limit)
+      });
+
+      console.log('🔍 [CONTROLLER] getMyProjects - Resultado:', result);
 
       res.json({
         success: true,
-        data: { projects }
+        data: result.projects,
+        pagination: result.pagination
       });
-
     } catch (error) {
-      console.error('Error obteniendo mis proyectos:', error);
+      console.error('🔍 [CONTROLLER] getMyProjects - Error:', error);
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor'
+        message: 'Error obteniendo mis proyectos',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }

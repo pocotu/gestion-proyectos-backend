@@ -90,6 +90,78 @@ class ProjectRepository extends BaseRepository {
   }
 
   /**
+   * Buscar proyectos con filtros avanzados
+   */
+  async search(query = '', { limit = 10, offset = 0, userId = null, isAdmin = false } = {}) {
+    let queryBuilder = this.db('proyectos as p')
+      .select('p.*')
+      .where(function() {
+        if (query) {
+          this.where('p.titulo', 'LIKE', `%${query}%`)
+              .orWhere('p.descripcion', 'LIKE', `%${query}%`);
+        }
+      });
+
+    // Si no es admin, filtrar por acceso del usuario
+    if (!isAdmin && userId) {
+      queryBuilder = queryBuilder.where(function() {
+        this.whereExists(function() {
+          this.select('1')
+              .from('proyecto_responsables as pr')
+              .whereRaw('pr.proyecto_id = p.id')
+              .where('pr.usuario_id', userId)
+              .where('pr.activo', true);
+        }).orWhereExists(function() {
+          this.select('1')
+              .from('tareas as t')
+              .whereRaw('t.proyecto_id = p.id')
+              .where('t.asignado_a', userId);
+        });
+      });
+    }
+
+    return await queryBuilder
+      .orderBy('p.created_at', 'DESC')
+      .limit(limit)
+      .offset(offset);
+  }
+
+  /**
+   * Contar resultados de búsqueda
+   */
+  async countSearch(query = '', userId = null, isAdmin = false) {
+    let queryBuilder = this.db('proyectos as p')
+      .count('p.id as count')
+      .where(function() {
+        if (query) {
+          this.where('p.titulo', 'LIKE', `%${query}%`)
+              .orWhere('p.descripcion', 'LIKE', `%${query}%`);
+        }
+      });
+
+    // Si no es admin, filtrar por acceso del usuario
+    if (!isAdmin && userId) {
+      queryBuilder = queryBuilder.where(function() {
+        this.whereExists(function() {
+          this.select('1')
+              .from('proyecto_responsables as pr')
+              .whereRaw('pr.proyecto_id = p.id')
+              .where('pr.usuario_id', userId)
+              .where('pr.activo', true);
+        }).orWhereExists(function() {
+          this.select('1')
+              .from('tareas as t')
+              .whereRaw('t.proyecto_id = p.id')
+              .where('t.asignado_a', userId);
+        });
+      });
+    }
+
+    const result = await queryBuilder.first();
+    return result?.count || 0;
+  }
+
+  /**
    * Busca proyectos por rango de fechas de inicio
    */
   async findByStartDateRange(startDate, endDate) {
@@ -344,14 +416,65 @@ class ProjectRepository extends BaseRepository {
   /**
    * Busca proyectos donde un usuario es responsable
    */
-  async findByResponsible(userId) {
-    return await this.raw(`
-      SELECT DISTINCT p.*, pr.rol_responsabilidad
-      FROM proyectos p
-      INNER JOIN proyecto_responsables pr ON p.id = pr.proyecto_id
-      WHERE pr.usuario_id = ? AND pr.activo = TRUE
-      ORDER BY p.created_at DESC
-    `, [userId]);
+  async findByResponsible(userId, { limit = 10, offset = 0 } = {}) {
+    try {
+      console.log('🔍 [PROJECT-REPO] findByResponsible - userId:', userId, 'limit:', limit, 'offset:', offset);
+      
+      // Convertir a números para evitar problemas con MySQL
+      const numericLimit = parseInt(limit, 10);
+      const numericOffset = parseInt(offset, 10);
+      const numericUserId = parseInt(userId, 10);
+      
+      console.log('🔍 [PROJECT-REPO] findByResponsible - Parámetros convertidos:', {
+        userId: numericUserId,
+        limit: numericLimit,
+        offset: numericOffset
+      });
+      
+      // Usar query sin prepared statements para LIMIT y OFFSET
+      const query = `
+        SELECT DISTINCT p.*, pr.rol_responsabilidad
+        FROM proyectos p
+        INNER JOIN proyecto_responsables pr ON p.id = pr.proyecto_id
+        WHERE pr.usuario_id = ${numericUserId} AND pr.activo = TRUE
+        ORDER BY p.created_at DESC
+        LIMIT ${numericLimit} OFFSET ${numericOffset}
+      `;
+      
+      console.log('🔍 [PROJECT-REPO] findByResponsible - Ejecutando query:', query);
+      
+      const result = await this.raw(query, []);
+      
+      console.log('🔍 [PROJECT-REPO] findByResponsible - Resultado:', result.length, 'proyectos encontrados');
+      
+      return result;
+    } catch (error) {
+      console.error('🔍 [PROJECT-REPO] findByResponsible - Error:', error.message);
+      console.error('🔍 [PROJECT-REPO] findByResponsible - Stack:', error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Cuenta proyectos donde un usuario es responsable
+   */
+  async countByResponsible(userId) {
+    try {
+      const numericUserId = parseInt(userId, 10);
+      
+      const query = `
+        SELECT COUNT(DISTINCT p.id) as total
+        FROM proyectos p
+        INNER JOIN proyecto_responsables pr ON p.id = pr.proyecto_id
+        WHERE pr.usuario_id = ? AND pr.activo = TRUE
+      `;
+      
+      const result = await this.raw(query, [numericUserId]);
+      return result[0]?.total || 0;
+    } catch (error) {
+      console.error('Error contando proyectos por responsable:', error);
+      throw error;
+    }
   }
 
   /**
@@ -536,6 +659,85 @@ class ProjectRepository extends BaseRepository {
       return rows;
     } catch (error) {
       console.error('Error en ProjectRepository.findRecent:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener tareas del proyecto
+   */
+  async getProjectTasks(projectId) {
+    try {
+      const { pool } = require('../config/db');
+      const query = `
+        SELECT 
+          t.*,
+          u.nombre as asignado_a_nombre,
+          u.email as asignado_a_email
+        FROM tareas t
+        LEFT JOIN usuarios u ON t.asignado_a = u.id
+        WHERE t.proyecto_id = ?
+        ORDER BY t.fecha_creacion DESC
+      `;
+      
+      const [rows] = await pool.execute(query, [projectId]);
+      return rows;
+    } catch (error) {
+      console.error('Error en ProjectRepository.getProjectTasks:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener estadísticas del proyecto
+   */
+  async getProjectStats(projectId) {
+    try {
+      const { pool } = require('../config/db');
+      
+      // Obtener estadísticas de tareas
+      const taskStatsQuery = `
+        SELECT 
+          COUNT(*) as total_tareas,
+          SUM(CASE WHEN estado = 'completada' THEN 1 ELSE 0 END) as tareas_completadas,
+          SUM(CASE WHEN estado = 'en_progreso' THEN 1 ELSE 0 END) as tareas_en_progreso,
+          SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as tareas_pendientes
+        FROM tareas 
+        WHERE proyecto_id = ?
+      `;
+      
+      // Obtener estadísticas de responsables
+      const responsibleStatsQuery = `
+        SELECT COUNT(*) as total_responsables
+        FROM proyecto_responsables 
+        WHERE proyecto_id = ? AND activo = true
+      `;
+      
+      const [taskStats] = await pool.execute(taskStatsQuery, [projectId]);
+      const [responsibleStats] = await pool.execute(responsibleStatsQuery, [projectId]);
+      
+      const stats = {
+        tareas: {
+          total: parseInt(taskStats[0].total_tareas) || 0,
+          completadas: parseInt(taskStats[0].tareas_completadas) || 0,
+          en_progreso: parseInt(taskStats[0].tareas_en_progreso) || 0,
+          pendientes: parseInt(taskStats[0].tareas_pendientes) || 0
+        },
+        responsables: {
+          total: parseInt(responsibleStats[0].total_responsables) || 0
+        }
+      };
+      
+      // Calcular progreso
+      if (stats.tareas.total > 0) {
+        stats.progreso = Math.round((stats.tareas.completadas / stats.tareas.total) * 100);
+      } else {
+        stats.progreso = 0;
+      }
+      
+      return stats;
+    } catch (error) {
+      console.error('Error en ProjectRepository.getProjectStats:', error);
       throw error;
     }
   }

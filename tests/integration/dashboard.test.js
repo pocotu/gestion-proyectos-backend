@@ -28,36 +28,62 @@ describe('Dashboard Integration Tests', () => {
   let testTask;
 
   beforeAll(async () => {
+    console.log('🧪 [TEST] ===== SETUP DASHBOARD TEST =====');
+    
     // Inicializar utilidades de test
     dbHelper = new DatabaseHelper();
-    authHelper = new AuthHelper();
     logger = new TestLogger('Dashboard Tests');
     config = new TestConfig();
 
+    console.log('🧪 [SETUP] Iniciando setup del test dashboard');
+
     // Configurar base de datos de test
     await dbHelper.setupTestDatabase();
+    
+    // Inicializar AuthHelper con app y dbHelper
+    authHelper = new AuthHelper(app, dbHelper);
+    
+    console.log('🧪 [SETUP] Creando usuarios de prueba...');
     
     // Crear usuarios de prueba
     testAdmin = await authHelper.createTestAdmin();
     testUser = await authHelper.createTestUser();
     
+    console.log('🧪 [SETUP] Usuarios creados:', { 
+      admin: { id: testAdmin.id, email: testAdmin.email, es_administrador: testAdmin.es_administrador },
+      user: { id: testUser.id, email: testUser.email, es_administrador: testUser.es_administrador }
+    });
+    
+    // Verificar que el usuario existe en la base de datos
+    const { pool } = require('../../src/config/db');
+    const [rows] = await pool.execute('SELECT * FROM usuarios WHERE id = ?', [testAdmin.id]);
+    console.log('🧪 [TEST] Usuario en BD:', rows.length > 0 ? { id: rows[0].id, email: rows[0].email, es_administrador: rows[0].es_administrador } : 'No encontrado');
+    
     // Generar tokens
-    adminToken = await authHelper.generateToken(testAdmin);
-    userToken = await authHelper.generateToken(testUser);
+    console.log('🧪 [TEST] Generando token...');
+    adminToken = authHelper.generateToken(testAdmin);
+    userToken = authHelper.generateToken(testUser);
+
+    console.log('🧪 [SETUP] Tokens generados:', { 
+      adminToken: adminToken ? 'Presente' : 'Ausente',
+      userToken: userToken ? 'Presente' : 'Ausente'
+    });
+    console.log('🧪 [SETUP] JWT_SECRET:', process.env.JWT_SECRET);
 
     // Crear datos de prueba
     testProject = await dbHelper.createTestProject({
-      nombre: 'Proyecto Dashboard Test',
+      titulo: 'Proyecto Dashboard Test',
       descripcion: 'Proyecto para tests del dashboard',
-      responsable_id: testUser.id,
-      estado: 'activo'
+      creado_por: testUser.id,
+      estado: 'en_progreso'
     });
 
     testTask = await dbHelper.createTestTask({
       titulo: 'Tarea Dashboard Test',
       descripcion: 'Tarea para tests del dashboard',
       proyecto_id: testProject.id,
-      asignado_a: testUser.id,
+      usuario_asignado_id: testUser.id,
+      creado_por: testUser.id,
       estado: 'pendiente',
       prioridad: 'media'
     });
@@ -76,9 +102,17 @@ describe('Dashboard Integration Tests', () => {
     it('debería obtener resumen completo del dashboard para usuario normal', async () => {
       const response = await request(app)
         .get('/api/dashboard/summary')
-        .set('Authorization', `Bearer ${userToken}`)
-        .expect(200);
+        .set('Authorization', `Bearer ${userToken}`);
 
+      console.log('Response status:', response.status);
+      console.log('Response body:', JSON.stringify(response.body, null, 2));
+      
+      if (response.status !== 200) {
+        console.log('Error details:', response.body);
+        console.log('Headers:', response.headers);
+      }
+      
+      expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty('projects');
       expect(response.body.data).toHaveProperty('tasks');
@@ -88,10 +122,26 @@ describe('Dashboard Integration Tests', () => {
     });
 
     it('debería obtener resumen completo del dashboard para administrador', async () => {
+      console.log('🧪 [TEST] ===== INICIANDO TEST ADMIN =====');
+      console.log('🧪 [TEST] Admin token existe:', !!adminToken);
+      console.log('🧪 [TEST] Admin user existe:', !!testAdmin);
+      
+      if (!adminToken) {
+        console.log('❌ [TEST] No hay token de admin - regenerando...');
+        adminToken = authHelper.generateToken(testAdmin);
+      }
+      
+      console.log('🧪 [TEST] Token completo:', adminToken);
+      console.log('🧪 [TEST] JWT_SECRET en test:', process.env.JWT_SECRET);
+      
       const response = await request(app)
         .get('/api/dashboard/summary')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+        .set('Authorization', `Bearer ${adminToken}`);
+      
+      console.log('🧪 [TEST] Response status:', response.status);
+      console.log('🧪 [TEST] Response body:', JSON.stringify(response.body, null, 2));
+      
+      expect(response.status).toBe(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty('projects');

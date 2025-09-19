@@ -208,6 +208,104 @@ class DatabaseHelper {
   }
 
   /**
+   * Configurar base de datos de test
+   */
+  async setupTestDatabase() {
+    try {
+      await this.initialize();
+      await this.createTables();
+      await this.cleanTestData();
+      this.logger.success('Base de datos de test configurada exitosamente');
+    } catch (error) {
+      this.logger.error('Error configurando base de datos de test', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Limpiar base de datos de test
+   */
+  async cleanupTestDatabase() {
+    try {
+      await this.cleanTestData();
+      await this.close();
+      this.logger.success('Cleanup de base de datos completado');
+    } catch (error) {
+      this.logger.error('Error en cleanup de base de datos', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear proyecto de prueba
+   */
+  async createTestProject(projectData = {}) {
+    try {
+      const defaultProject = {
+        titulo: 'Proyecto Test',
+        descripcion: 'Proyecto para pruebas',
+        creado_por: 1,
+        estado: 'planificacion',
+        fecha_inicio: new Date(),
+        fecha_fin: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 días después
+      };
+
+      const project = { ...defaultProject, ...projectData };
+      
+      const [result] = await this.connection.execute(
+        `INSERT INTO proyectos (titulo, descripcion, creado_por, estado, fecha_inicio, fecha_fin) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [project.titulo, project.descripcion, project.creado_por, project.estado, project.fecha_inicio, project.fecha_fin]
+      );
+
+      const projectId = result.insertId;
+      const createdProject = { ...project, id: projectId };
+      
+      this.logger.success('Proyecto de prueba creado', { id: projectId, titulo: project.titulo });
+      return createdProject;
+    } catch (error) {
+      this.logger.error('Error creando proyecto de prueba', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear tarea de prueba
+   */
+  async createTestTask(taskData = {}) {
+    try {
+      const defaultTask = {
+        titulo: 'Tarea Test',
+        descripcion: 'Tarea para pruebas',
+        proyecto_id: 1,
+        usuario_asignado_id: 1,
+        creado_por: 1,
+        estado: 'pendiente',
+        prioridad: 'media',
+        fecha_inicio: new Date(),
+        fecha_fin: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 días después
+      };
+
+      const task = { ...defaultTask, ...taskData };
+      
+      const [result] = await this.connection.execute(
+        `INSERT INTO tareas (titulo, descripcion, proyecto_id, usuario_asignado_id, creado_por, estado, prioridad, fecha_inicio, fecha_fin) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [task.titulo, task.descripcion, task.proyecto_id, task.usuario_asignado_id, task.creado_por, task.estado, task.prioridad, task.fecha_inicio, task.fecha_fin]
+      );
+
+      const taskId = result.insertId;
+      const createdTask = { ...task, id: taskId };
+      
+      this.logger.success('Tarea de prueba creada', { id: taskId, titulo: task.titulo });
+      return createdTask;
+    } catch (error) {
+      this.logger.error('Error creando tarea de prueba', error);
+      throw error;
+    }
+  }
+
+  /**
    * Limpiar datos de prueba
    */
   async cleanTestData() {

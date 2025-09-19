@@ -19,7 +19,7 @@ if (!process.env.DB_NAME) {
 }
 
 if (!process.env.JWT_SECRET) {
-  process.env.JWT_SECRET = 'test_secret_key_for_integration_tests';
+  process.env.JWT_SECRET = 'test_jwt_secret_key_for_integration_tests_only';
 }
 
 if (!process.env.PORT) {
@@ -35,3 +35,4 @@ process.env.LOG_LEVEL = 'error';
 console.log('🔧 Variables de entorno configuradas para tests');
 console.log(`📊 Base de datos: ${process.env.DB_NAME}`);
 console.log(`🚀 Puerto: ${process.env.PORT}`);
+console.log(`🔐 JWT_SECRET: ${process.env.JWT_SECRET ? 'Configurado' : 'No configurado'}`);

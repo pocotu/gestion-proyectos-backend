@@ -40,8 +40,12 @@ module.exports = {
   // Verbose para ver detalles
   verbose: true,
   
-  // Configuración adicional para debugging
+  // Configuración adicional para debugging - CAMBIADO
   silent: false,
-  detectOpenHandles: false,
-  forceExit: true
+  detectOpenHandles: true,
+  forceExit: false,
+  
+  // Configuración adicional para capturar errores
+  collectCoverage: false,
+  bail: 1
 };

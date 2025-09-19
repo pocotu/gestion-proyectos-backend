@@ -98,15 +98,25 @@ class AuthHelper {
         iat: Math.floor(Date.now() / 1000)
       };
 
-      const token = jwt.sign(payload, process.env.JWT_SECRET || 'test_secret', {
+      console.log('🔐 [AUTH-HELPER] Generando token para usuario:', { 
+        id: user.id, 
+        email: user.email, 
+        es_administrador: user.es_administrador 
+      });
+      console.log('🔐 [AUTH-HELPER] JWT_SECRET usado:', process.env.JWT_SECRET);
+
+      const token = jwt.sign(payload, process.env.JWT_SECRET || 'dev_secret', {
         expiresIn,
         issuer: 'gestion-proyectos-test'
       });
+
+      console.log('🔐 [AUTH-HELPER] Token generado exitosamente:', token.substring(0, 50) + '...');
 
       this.logger.debug('Token generado', { userId: user.id, expiresIn });
       return token;
 
     } catch (error) {
+      console.log('❌ [AUTH-HELPER] Error al generar token:', error);
       this.logger.error('Error al generar token', error);
       throw error;
     }
@@ -213,7 +223,7 @@ class AuthHelper {
    */
   verifyToken(token) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'test_secret');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret');
       this.logger.debug('Token verificado', { userId: decoded.id });
       return decoded;
     } catch (error) {
@@ -284,22 +294,28 @@ class AuthHelper {
   }
 
   /**
-   * Limpiar datos de autenticación de prueba
+   * Limpiar datos de prueba de autenticación
    */
-  async cleanup() {
+  async cleanupTestData() {
     try {
-      this.logger.info('Limpiando datos de autenticación de prueba');
-
+      this.logger.info('Limpiando datos de prueba de autenticación');
+      
       // Limpiar cache
       this.testUsers.clear();
       this.testTokens.clear();
-
-      this.logger.success('Cleanup de autenticación completado');
-
+      
+      this.logger.success('Datos de prueba de autenticación limpiados');
     } catch (error) {
-      this.logger.error('Error en cleanup de autenticación', error);
+      this.logger.error('Error limpiando datos de prueba de autenticación', error);
       throw error;
     }
+  }
+
+  /**
+   * Limpiar datos de prueba (alias para compatibilidad)
+   */
+  async cleanup() {
+    return await this.cleanupTestData();
   }
 
   /**

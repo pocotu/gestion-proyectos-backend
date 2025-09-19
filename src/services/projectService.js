@@ -1,5 +1,6 @@
 const ProjectRepository = require('../repositories/ProjectRepository');
 const ProjectResponsibleRepository = require('../repositories/ProjectResponsibleRepository');
+const UserRepository = require('../repositories/UserRepository');
 
 /**
  * ProjectService - Servicio para gestión de proyectos
@@ -14,6 +15,7 @@ class ProjectService {
   constructor() {
     this.projectRepository = new ProjectRepository();
     this.projectResponsibleRepository = new ProjectResponsibleRepository();
+    this.userRepository = new UserRepository();
   }
 
   /**
@@ -339,8 +341,17 @@ class ProjectService {
   /**
    * Buscar proyectos
    */
-  async searchProjects(query, { page = 1, limit = 10, userId = null, isAdmin = false }) {
+  async searchProjects(query = '', { page = 1, limit = 10, userId = null, isAdmin = false } = {}) {
     try {
+      // Validar parámetros
+      if (typeof query !== 'string') {
+        throw new Error('El parámetro de búsqueda debe ser una cadena de texto');
+      }
+
+      if (page < 1 || limit < 1) {
+        throw new Error('Los parámetros de paginación deben ser números positivos');
+      }
+
       const offset = (page - 1) * limit;
       
       const projects = await this.projectRepository.search(query, {
@@ -363,7 +374,7 @@ class ProjectService {
       };
     } catch (error) {
       console.error('Error en ProjectService.searchProjects:', error);
-      throw new Error('Error buscando proyectos');
+      throw error; // Re-lanzar el error original para mantener el mensaje específico
     }
   }
 
@@ -401,8 +412,10 @@ class ProjectService {
   /**
    * Obtener mis proyectos (donde soy responsable)
    */
-  async getMyProjects(userId, { page = 1, limit = 10 }) {
+  async getUserProjects(userId, { page = 1, limit = 10 } = {}) {
     try {
+      console.log('🔍 [PROJECT-SERVICE] getUserProjects - userId:', userId, 'page:', page, 'limit:', limit);
+      
       const offset = (page - 1) * limit;
       
       const projects = await this.projectRepository.findByResponsible(userId, {
@@ -410,7 +423,11 @@ class ProjectService {
         offset
       });
 
+      console.log('🔍 [PROJECT-SERVICE] getUserProjects - projects found:', projects.length);
+
       const total = await this.projectRepository.countByResponsible(userId);
+
+      console.log('🔍 [PROJECT-SERVICE] getUserProjects - total count:', total);
 
       return {
         projects,
@@ -422,9 +439,16 @@ class ProjectService {
         }
       };
     } catch (error) {
-      console.error('Error en ProjectService.getMyProjects:', error);
+      console.error('Error en ProjectService.getUserProjects:', error);
       throw new Error('Error obteniendo mis proyectos');
     }
+  }
+
+  /**
+   * Obtener mis proyectos (donde soy responsable) - alias para compatibilidad
+   */
+  async getMyProjects(userId, { page = 1, limit = 10 } = {}) {
+    return this.getUserProjects(userId, { page, limit });
   }
 
   /**

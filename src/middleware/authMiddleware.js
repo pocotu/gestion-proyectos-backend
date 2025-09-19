@@ -24,10 +24,16 @@ class AuthMiddleware {
   authenticate() {
     return async (req, res, next) => {
       try {
+        console.log('🔐 [AUTH-MIDDLEWARE] Iniciando autenticación para:', req.method, req.path);
+        console.log('🔐 [AUTH-MIDDLEWARE] Headers:', JSON.stringify(req.headers, null, 2));
+        
         // Extraer token del header Authorization
         const token = this._extractToken(req);
+        console.log('🔐 [AUTH-MIDDLEWARE] Token extraído:', token ? 'Presente' : 'Ausente');
+        console.log('🔐 [AUTH-MIDDLEWARE] Token completo:', token);
         
         if (!token) {
+          console.log('🔐 [AUTH-MIDDLEWARE] Error: Token no encontrado');
           return res.status(401).json({
             success: false,
             message: 'Token de acceso requerido'
@@ -35,8 +41,12 @@ class AuthMiddleware {
         }
 
         // Verificar si el token está en blacklist
+        console.log('🔐 [AUTH-MIDDLEWARE] Verificando blacklist...');
         const isBlacklisted = await this.refreshTokenService.isJWTBlacklisted(token);
+        console.log('🔐 [AUTH-MIDDLEWARE] Token en blacklist:', isBlacklisted);
+        
         if (isBlacklisted) {
+          console.log('🔐 [AUTH-MIDDLEWARE] Error: Token en blacklist');
           return res.status(401).json({
             success: false,
             message: 'Token inválido o revocado'
@@ -44,7 +54,9 @@ class AuthMiddleware {
         }
 
         // Verificar token y obtener usuario
+        console.log('🔐 [AUTH-MIDDLEWARE] Verificando token...');
         const user = await this.authService.verifyToken(token);
+        console.log('🔐 [AUTH-MIDDLEWARE] Usuario verificado:', { id: user.id, email: user.email, es_administrador: user.es_administrador });
         
         // Agregar usuario al request para uso posterior
         req.user = user;
@@ -53,17 +65,21 @@ class AuthMiddleware {
         next();
 
       } catch (error) {
-        console.error('Error en autenticación:', error);
-
+        console.log('🔐 [AUTH-MIDDLEWARE] Error en autenticación:', error.message);
+        console.log('🔐 [AUTH-MIDDLEWARE] Stack trace:', error.stack);
+        
+        // Determinar el tipo de error y responder apropiadamente
         if (error.message.includes('Token inválido') || 
             error.message.includes('Token expirado') ||
+            error.message.includes('Usuario no encontrado') ||
             error.message.includes('Usuario no válido')) {
           return res.status(401).json({
             success: false,
-            message: error.message
+            message: 'Token inválido o expirado'
           });
         }
 
+        // Error interno del servidor
         return res.status(500).json({
           success: false,
           message: 'Error interno del servidor'

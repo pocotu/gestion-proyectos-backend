@@ -297,48 +297,77 @@ class PermissionMiddleware {
   }
 
   /**
-   * Middleware para adjuntar información de permisos al request
-   * Útil para controladores que necesitan verificar permisos dinámicamente
+   * Middleware para adjuntar permisos del usuario al request
+   * Debe usarse después del middleware authenticate()
    */
   attachPermissions() {
     return async (req, res, next) => {
       try {
+        console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Iniciando');
+        console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - req.user:', req.user);
+        
         // Verificar que el usuario esté autenticado
-        if (!req.user || !req.user.id) {
+        if (!req.user) {
+          console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Usuario no autenticado');
           return res.status(401).json({
             success: false,
             message: 'Usuario no autenticado'
           });
         }
 
-        // Si es admin, adjuntar todos los permisos
+        console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Usuario autenticado, ID:', req.user.id);
+
+        // Si es administrador, adjuntar permisos de admin
         if (req.user.es_administrador) {
-          req.userRoles = [ROLES.ADMIN];
-          req.userPermissions = Object.values(PERMISSIONS).flatMap(p => Object.values(p));
-          req.hasPermission = () => true;
-          req.isAdmin = true;
-          next();
-          return;
+          console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Usuario es administrador');
+          req.userRoles = [{ nombre: 'admin' }];
+          req.userPermissions = ['*']; // Todos los permisos
+          return next();
         }
 
+        console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Usuario no es admin, obteniendo roles...');
+
         // Obtener roles del usuario
-        const userRoles = await this.userRoleRepository.getUserRoles(req.user.id);
-        const userRoleNames = userRoles.map(role => role.rol_nombre);
+        try {
+          const userRoles = await this.userRoleRepository.getUserRoles(req.user.id);
+          console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Roles obtenidos:', userRoles);
+          
+          req.userRoles = userRoles;
 
-        // Adjuntar información al request
-        req.userRoles = userRoleNames;
-        req.userPermissions = getUserPermissions(userRoleNames);
-        req.hasPermission = (permission) => userHasPermission(userRoleNames, permission);
-        req.isAdmin = false;
+          // Obtener permisos basados en roles
+          const permissions = [];
+          for (const role of userRoles) {
+            try {
+              const rolePermissions = await this.rolePermissionRepository.getRolePermissions(role.rol_id);
+              console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Permisos del rol', role.rol_nombre, ':', rolePermissions);
+              permissions.push(...rolePermissions);
+            } catch (roleError) {
+              console.error('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Error obteniendo permisos del rol:', roleError.message);
+            }
+          }
 
-        next();
+          req.userPermissions = permissions;
+          console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Permisos finales:', permissions);
+
+          next();
+        } catch (roleError) {
+          console.error('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Error obteniendo roles:', roleError.message);
+          console.error('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Stack:', roleError.stack);
+          
+          // En caso de error, continuar sin permisos específicos
+          req.userRoles = [];
+          req.userPermissions = [];
+          next();
+        }
 
       } catch (error) {
-        console.error('Error adjuntando permisos:', error);
-        return res.status(500).json({
-          success: false,
-          message: 'Error interno del servidor'
-        });
+        console.error('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Error general:', error.message);
+        console.error('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Stack:', error.stack);
+        
+        // En lugar de devolver 500, continuar sin permisos
+        req.userRoles = [];
+        req.userPermissions = [];
+        next();
       }
     };
   }

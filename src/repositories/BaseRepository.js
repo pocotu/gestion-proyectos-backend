@@ -318,8 +318,22 @@ class BaseRepository {
    * Ejecuta una query personalizada
    */
   async raw(query, params = []) {
-    const [rows] = await pool.execute(query, params);
-    return rows;
+    try {
+      console.log('🔍 [BASE-REPO] raw - Ejecutando query:', query);
+      console.log('🔍 [BASE-REPO] raw - Parámetros:', params);
+      
+      const [rows] = await pool.execute(query, params);
+      
+      console.log('🔍 [BASE-REPO] raw - Resultado:', rows.length, 'filas');
+      
+      return rows;
+    } catch (error) {
+      console.error('🔍 [BASE-REPO] raw - Error:', error.message);
+      console.error('🔍 [BASE-REPO] raw - Stack:', error.stack);
+      console.error('🔍 [BASE-REPO] raw - Query:', query);
+      console.error('🔍 [BASE-REPO] raw - Params:', params);
+      throw error;
+    }
   }
 
   /**

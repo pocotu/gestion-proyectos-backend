@@ -19,8 +19,31 @@ class UserRepository extends BaseRepository {
    * Busca un usuario por ID
    */
   async findById(id) {
-    this.reset();
-    return this.where('id', id).first();
+    try {
+      console.log('🔍 [USER-REPO] Buscando usuario por ID:', id);
+      this.reset();
+      
+      // Usar query SQL directa para diagnosticar
+      const { pool } = require('../config/db');
+      const [rows] = await pool.execute('SELECT * FROM usuarios WHERE id = ?', [id]);
+      
+      console.log('🔍 [USER-REPO] Usuarios encontrados:', rows.length);
+      if (rows.length > 0) {
+        console.log('🔍 [USER-REPO] Usuario encontrado:', { 
+          id: rows[0].id, 
+          email: rows[0].email, 
+          es_administrador: rows[0].es_administrador,
+          estado: rows[0].estado 
+        });
+        return rows[0];
+      } else {
+        console.log('🔍 [USER-REPO] No se encontró usuario con ID:', id);
+        return null;
+      }
+    } catch (error) {
+      console.log('❌ [USER-REPO] Error buscando usuario por ID:', error);
+      throw error;
+    }
   }
 
   /**

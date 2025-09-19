@@ -26,21 +26,59 @@ class DashboardController {
    */
   async getDashboardSummary(req, res) {
     try {
+      console.log('=== DASHBOARD SUMMARY DEBUG ===');
       const userId = req.user.id;
       const isAdmin = req.user.es_administrador;
+      console.log('Usuario ID:', userId, 'Es Admin:', isAdmin);
 
       // Obtener estadísticas según el rol del usuario
-      const [projectStats, taskStats, userStats] = await Promise.all([
-        this.projectService.getProjectsOverview(userId, isAdmin),
-        this.taskService.getTaskStatistics(userId, isAdmin),
-        isAdmin ? this.userService.getUserStatistics() : null
-      ]);
+      let projectStats, taskStats, userStats;
+
+      if (isAdmin) {
+        console.log('Obteniendo estadísticas de admin...');
+        // Admin puede ver todas las estadísticas
+        try {
+          console.log('Obteniendo projectStats...');
+          projectStats = await this.projectService.getProjectsOverview(null, true);
+          console.log('ProjectStats obtenidas:', projectStats);
+        } catch (error) {
+          console.error('Error en projectStats:', error);
+          throw error;
+        }
+
+        try {
+          console.log('Obteniendo taskStats...');
+          taskStats = await this.taskService.getTaskStatistics(null, true);
+          console.log('TaskStats obtenidas:', taskStats);
+        } catch (error) {
+          console.error('Error en taskStats:', error);
+          throw error;
+        }
+
+        try {
+          console.log('Obteniendo userStats...');
+          userStats = await this.userService.getUserStatistics();
+          console.log('UserStats obtenidas:', userStats);
+        } catch (error) {
+          console.error('Error en userStats:', error);
+          throw error;
+        }
+      } else {
+        console.log('Obteniendo estadísticas de usuario normal...');
+        // Usuario normal solo ve sus propias estadísticas
+        projectStats = await this.projectService.getProjectsOverview(userId, false);
+        taskStats = await this.taskService.getTaskStatistics(userId, false);
+        userStats = null; // Los usuarios normales no ven estadísticas de usuarios
+      }
 
       const summary = {
         projects: projectStats,
         tasks: taskStats,
-        ...(isAdmin && { users: userStats })
+        ...(userStats && { users: userStats })
       };
+
+      console.log('Summary final:', summary);
+      console.log('=== FIN DEBUG ===');
 
       res.json({
         success: true,
@@ -49,9 +87,11 @@ class DashboardController {
 
     } catch (error) {
       console.error('Error obteniendo resumen del dashboard:', error);
+      console.error('Stack trace:', error.stack);
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor'
+        message: 'Error interno del servidor',
+        error: error.message
       });
     }
   }
