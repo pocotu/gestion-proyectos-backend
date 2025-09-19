@@ -39,7 +39,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-01-15',
         fecha_fin: '2024-06-30',
         estado: 'en_progreso',
-        creado_por: 2
+        creado_por: users[0].id // Usar el primer usuario disponible
       },
       {
         titulo: 'Aplicación Móvil de Delivery',
@@ -47,7 +47,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-02-01',
         fecha_fin: '2024-08-15',
         estado: 'planificacion',
-        creado_por: 2
+        creado_por: users[1] ? users[1].id : users[0].id // Usar el segundo usuario si existe
       },
       {
         titulo: 'Portal Web Corporativo',
@@ -55,7 +55,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-03-01',
         fecha_fin: '2024-07-31',
         estado: 'en_progreso',
-        creado_por: 2
+        creado_por: users[2] ? users[2].id : users[0].id // Usar el tercer usuario si existe
       },
       {
         titulo: 'Sistema de Recursos Humanos',
@@ -63,7 +63,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-01-10',
         fecha_fin: '2024-12-31',
         estado: 'en_progreso',
-        creado_por: 2
+        creado_por: users[0].id // Usar el primer usuario disponible
       },
       {
         titulo: 'API de Integración Bancaria',
@@ -71,7 +71,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-04-01',
         fecha_fin: '2024-09-30',
         estado: 'planificacion',
-        creado_por: 2
+        creado_por: users[1] ? users[1].id : users[0].id // Usar el segundo usuario si existe
       },
       {
         titulo: 'Dashboard de Analytics',
@@ -79,7 +79,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-02-15',
         fecha_fin: '2024-05-30',
         estado: 'completado',
-        creado_por: 2
+        creado_por: users[2] ? users[2].id : users[0].id // Usar el tercer usuario si existe
       }
     ];
 

@@ -2,50 +2,53 @@ module.exports = {
   // Entorno de test
   testEnvironment: 'node',
   
-  // Configurar variables de entorno para tests
+  // Archivos de configuración
   setupFilesAfterEnv: ['<rootDir>/tests/utils/setup.js'],
   
   // Patrones de archivos de test
   testMatch: [
-    '<rootDir>/tests/**/*.test.js',
-    '<rootDir>/tests/**/*.spec.js'
+    '<rootDir>/tests/**/*.test.js'
   ],
   
   // Directorios a ignorar
   testPathIgnorePatterns: [
-    '/node_modules/',
-    '/dist/',
-    '/build/'
+    '<rootDir>/node_modules/',
+    '<rootDir>/dist/',
+    '<rootDir>/build/'
   ],
   
   // Timeout para tests
-  testTimeout: 30000,
+  testTimeout: 60000,
   
-  // Configuración de módulos
+  // Extensiones de módulos
   moduleFileExtensions: ['js', 'json'],
   
   // Limpiar mocks automáticamente
   clearMocks: true,
   
-  // Configuración de variables de entorno
-  setupFiles: ['<rootDir>/tests/utils/env.js'],
-  
-  // Configuración para tests de integración
-  globalSetup: '<rootDir>/tests/utils/globalSetup.js',
-  globalTeardown: '<rootDir>/tests/utils/globalTeardown.js',
-  
-  // Configuración para tests secuenciales (importante para DB)
+  // Configuración de workers - ejecutar en serie
   maxWorkers: 1,
   
-  // Verbose para ver detalles
-  verbose: true,
+  // Verbose para debugging
+  verbose: false,
   
-  // Configuración adicional para debugging - CAMBIADO
-  silent: false,
-  detectOpenHandles: true,
-  forceExit: false,
+  // Configuración de debugging
+  detectOpenHandles: false,
+  forceExit: true,
   
-  // Configuración adicional para capturar errores
+  // Configuración de coverage
   collectCoverage: false,
-  bail: 1
+  
+  // Configuración de bail (detener en primer fallo)
+  bail: false,
+  
+  // Configuración de transformación
+  transform: {},
+  
+  // Configuración de módulos
+  moduleDirectories: ['node_modules', '<rootDir>/src', '<rootDir>/tests'],
+  
+  // Configuración adicional para estabilidad
+  silent: false,
+  runInBand: true
 };

@@ -337,6 +337,23 @@ class BaseRepository {
   }
 
   /**
+   * Método para ejecutar queries SQL directas con parámetros
+   * Útil para queries complejas que no se pueden construir con el query builder
+   */
+  async rawQuery(sql, params = []) {
+    const [rows] = await pool.query(sql, params);
+    return rows;
+  }
+
+  /**
+   * Método para ejecutar queries de conteo directas
+   */
+  async rawCount(sql, params = []) {
+    const [rows] = await pool.query(sql, params);
+    return rows[0]?.count || 0;
+  }
+
+  /**
    * Inicia una transacción
    */
   async beginTransaction() {

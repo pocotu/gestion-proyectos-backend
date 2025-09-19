@@ -93,72 +93,89 @@ class ProjectRepository extends BaseRepository {
    * Buscar proyectos con filtros avanzados
    */
   async search(query = '', { limit = 10, offset = 0, userId = null, isAdmin = false } = {}) {
-    let queryBuilder = this.db('proyectos as p')
-      .select('p.*')
-      .where(function() {
-        if (query) {
-          this.where('p.titulo', 'LIKE', `%${query}%`)
-              .orWhere('p.descripcion', 'LIKE', `%${query}%`);
-        }
-      });
-
+    let sql = `
+      SELECT p.* 
+      FROM proyectos p
+    `;
+    
+    let whereConditions = [];
+    let params = [];
+    
+    // Filtro por query de búsqueda
+    if (query) {
+      whereConditions.push('(p.titulo LIKE ? OR p.descripcion LIKE ?)');
+      params.push(`%${query}%`, `%${query}%`);
+    }
+    
     // Si no es admin, filtrar por acceso del usuario
     if (!isAdmin && userId) {
-      queryBuilder = queryBuilder.where(function() {
-        this.whereExists(function() {
-          this.select('1')
-              .from('proyecto_responsables as pr')
-              .whereRaw('pr.proyecto_id = p.id')
-              .where('pr.usuario_id', userId)
-              .where('pr.activo', true);
-        }).orWhereExists(function() {
-          this.select('1')
-              .from('tareas as t')
-              .whereRaw('t.proyecto_id = p.id')
-              .where('t.asignado_a', userId);
-        });
-      });
+      whereConditions.push(`(
+        EXISTS (
+          SELECT 1 FROM proyecto_responsables pr 
+          WHERE pr.proyecto_id = p.id 
+          AND pr.usuario_id = ? 
+          AND pr.activo = true
+        ) 
+        OR EXISTS (
+          SELECT 1 FROM tareas t 
+          WHERE t.proyecto_id = p.id 
+          AND t.asignado_a = ?
+        )
+      )`);
+      params.push(userId, userId);
     }
-
-    return await queryBuilder
-      .orderBy('p.created_at', 'DESC')
-      .limit(limit)
-      .offset(offset);
+    
+    if (whereConditions.length > 0) {
+      sql += ' WHERE ' + whereConditions.join(' AND ');
+    }
+    
+    sql += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    
+    return await this.rawQuery(sql, params);
   }
 
   /**
    * Contar resultados de búsqueda
    */
   async countSearch(query = '', userId = null, isAdmin = false) {
-    let queryBuilder = this.db('proyectos as p')
-      .count('p.id as count')
-      .where(function() {
-        if (query) {
-          this.where('p.titulo', 'LIKE', `%${query}%`)
-              .orWhere('p.descripcion', 'LIKE', `%${query}%`);
-        }
-      });
-
+    let sql = `
+      SELECT COUNT(p.id) as count 
+      FROM proyectos p
+    `;
+    
+    let whereConditions = [];
+    let params = [];
+    
+    // Filtro por query de búsqueda
+    if (query) {
+      whereConditions.push('(p.titulo LIKE ? OR p.descripcion LIKE ?)');
+      params.push(`%${query}%`, `%${query}%`);
+    }
+    
     // Si no es admin, filtrar por acceso del usuario
     if (!isAdmin && userId) {
-      queryBuilder = queryBuilder.where(function() {
-        this.whereExists(function() {
-          this.select('1')
-              .from('proyecto_responsables as pr')
-              .whereRaw('pr.proyecto_id = p.id')
-              .where('pr.usuario_id', userId)
-              .where('pr.activo', true);
-        }).orWhereExists(function() {
-          this.select('1')
-              .from('tareas as t')
-              .whereRaw('t.proyecto_id = p.id')
-              .where('t.asignado_a', userId);
-        });
-      });
+      whereConditions.push(`(
+        EXISTS (
+          SELECT 1 FROM proyecto_responsables pr 
+          WHERE pr.proyecto_id = p.id 
+          AND pr.usuario_id = ? 
+          AND pr.activo = true
+        ) 
+        OR EXISTS (
+          SELECT 1 FROM tareas t 
+          WHERE t.proyecto_id = p.id 
+          AND t.asignado_a = ?
+        )
+      )`);
+      params.push(userId, userId);
     }
-
-    const result = await queryBuilder.first();
-    return result?.count || 0;
+    
+    if (whereConditions.length > 0) {
+      sql += ' WHERE ' + whereConditions.join(' AND ');
+    }
+    
+    return await this.rawCount(sql, params);
   }
 
   /**

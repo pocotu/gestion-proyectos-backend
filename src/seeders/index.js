@@ -80,7 +80,7 @@ class SeederManager {
     console.log(`🌱 Running specific seeder: ${seeder.constructor.name}...\n`);
     
     try {
-      await seeder.seed();
+      await seeder.run(); // Usar run() en lugar de seed() para inicializar la conexión
       console.log(`✅ ${seeder.constructor.name} completed successfully`);
       return true;
     } catch (error) {

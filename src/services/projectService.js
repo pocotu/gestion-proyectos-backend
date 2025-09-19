@@ -239,19 +239,19 @@ class ProjectService {
     try {
       const project = await this.projectRepository.findById(projectId);
       if (!project) {
-        throw new Error('Proyecto no encontrado');
+        return { success: false, message: 'Proyecto no encontrado' };
       }
 
       const isResponsible = await this.projectResponsibleRepository.isUserResponsible(projectId, userId);
       if (!isResponsible) {
-        throw new Error('El usuario no es responsable de este proyecto');
+        return { success: false, message: 'El usuario no es responsable de este proyecto' };
       }
 
       await this.projectResponsibleRepository.removeResponsible(projectId, userId);
-      return { message: 'Responsable removido correctamente' };
+      return { success: true, message: 'Responsable removido correctamente' };
     } catch (error) {
       console.error('Error en ProjectService.removeResponsible:', error);
-      throw error;
+      return { success: false, message: 'Error interno del servidor' };
     }
   }
 
@@ -500,6 +500,37 @@ class ProjectService {
     } catch (error) {
       console.error('Error en ProjectService.getRecentProjects:', error);
       throw new Error('Error obteniendo proyectos recientes');
+    }
+  }
+
+  /**
+   * Buscar proyectos
+   */
+  async search(query, { page = 1, limit = 10, userId = null, isAdmin = false } = {}) {
+    try {
+      const offset = (page - 1) * limit;
+      
+      const projects = await this.projectRepository.search(query, {
+        limit,
+        offset,
+        userId,
+        isAdmin
+      });
+
+      const total = await this.projectRepository.countSearch(query, userId, isAdmin);
+
+      return {
+        projects,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      console.error('Error en ProjectService.search:', error);
+      throw new Error('Error buscando proyectos');
     }
   }
 }

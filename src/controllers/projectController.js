@@ -757,17 +757,13 @@ class ProjectController {
     try {
       const { q: query, limit = 10, offset = 0, page = 1 } = req.query;
       
-      if (!query || query.trim() === '') {
-        return res.status(400).json({
-          success: false,
-          message: 'El parámetro de búsqueda "q" es requerido'
-        });
-      }
+      // Si no hay query, buscar todos los proyectos
+      const searchQuery = query ? query.trim() : '';
 
       const userId = req.user.id;
-      const isAdmin = req.user.permissions?.includes('admin') || false;
+      const isAdmin = req.user.es_administrador || false;
       
-      const result = await this.projectService.search(query.trim(), {
+      const result = await this.projectService.search(searchQuery, {
         page: parseInt(page),
         limit: parseInt(limit),
         userId,
@@ -840,7 +836,7 @@ class ProjectController {
 
       res.json({
         success: true,
-        data: result.projects,
+        projects: result.projects,
         pagination: result.pagination
       });
     } catch (error) {

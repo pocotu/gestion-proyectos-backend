@@ -53,6 +53,13 @@ router.get('/participating',
   projectController.getParticipatingProjects.bind(projectController)
 );
 
+// Buscar proyectos por término
+// GET /api/projects/search?q=termino&page=1&limit=10
+// Permisos: Usuario autenticado (solo ve proyectos a los que tiene acceso)
+router.get('/search', 
+  projectController.searchProjects.bind(projectController)
+);
+
 // Crear nuevo proyecto
 // POST /api/projects
 // Permisos: Solo responsables de proyecto y admin
@@ -196,13 +203,6 @@ router.get('/:id/progress',
 /**
  * Rutas de búsqueda y filtrado
  */
-
-// Buscar proyectos por término
-// GET /api/projects/search?q=termino&page=1&limit=10
-// Permisos: Usuario autenticado (solo ve proyectos a los que tiene acceso)
-router.get('/search', 
-  projectController.searchProjects.bind(projectController)
-);
 
 // Obtener proyectos por estado
 // GET /api/projects/by-status/:status
