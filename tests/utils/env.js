@@ -15,7 +15,7 @@ process.env.NODE_ENV = 'test';
 
 // Configurar variables por defecto si no están definidas
 if (!process.env.DB_NAME) {
-  process.env.DB_NAME = 'gestion_proyectos_test';
+  process.env.DB_NAME = 'gestion_proyectos';
 }
 
 if (!process.env.JWT_SECRET) {

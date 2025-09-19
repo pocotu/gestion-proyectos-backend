@@ -64,9 +64,9 @@ class DatabaseHelper {
     try {
       this.logger.info('Verificando y creando tablas necesarias');
 
-      const createTablesSQL = `
-        -- Tabla de Usuarios
-        CREATE TABLE IF NOT EXISTS usuarios (
+      // Crear tablas una por una para evitar problemas con múltiples statements
+      const tables = [
+        `CREATE TABLE IF NOT EXISTS usuarios (
           id INT AUTO_INCREMENT PRIMARY KEY,
           nombre VARCHAR(100) NOT NULL,
           email VARCHAR(100) UNIQUE NOT NULL,
@@ -77,16 +77,14 @@ class DatabaseHelper {
           configuraciones JSON DEFAULT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        );
-
-        -- Tabla de Roles
-        CREATE TABLE IF NOT EXISTS roles (
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS roles (
           id INT AUTO_INCREMENT PRIMARY KEY,
           nombre VARCHAR(50) NOT NULL UNIQUE
-        );
-
-        -- Tabla de Usuario-Rol
-        CREATE TABLE IF NOT EXISTS usuario_roles (
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS usuario_roles (
           id INT AUTO_INCREMENT PRIMARY KEY,
           usuario_id INT NOT NULL,
           rol_id INT NOT NULL,
@@ -99,10 +97,9 @@ class DatabaseHelper {
           FOREIGN KEY (rol_id) REFERENCES roles(id) ON DELETE CASCADE,
           FOREIGN KEY (asignado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
           UNIQUE KEY unique_usuario_rol (usuario_id, rol_id)
-        );
-
-        -- Tabla de Proyectos
-        CREATE TABLE IF NOT EXISTS proyectos (
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS proyectos (
           id INT AUTO_INCREMENT PRIMARY KEY,
           titulo VARCHAR(150) NOT NULL,
           descripcion TEXT,
@@ -113,39 +110,39 @@ class DatabaseHelper {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           FOREIGN KEY (creado_por) REFERENCES usuarios(id)
-        );
-
-        -- Tabla de Responsables de Proyecto
-        CREATE TABLE IF NOT EXISTS proyecto_responsables (
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS proyecto_responsables (
           id INT AUTO_INCREMENT PRIMARY KEY,
           proyecto_id INT NOT NULL,
           usuario_id INT NOT NULL,
           activo BOOLEAN DEFAULT TRUE,
-          rol_responsabilidad VARCHAR(50) DEFAULT 'responsable',
           asignado_por INT,
+          fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE,
           FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-          FOREIGN KEY (asignado_por) REFERENCES usuarios(id),
+          FOREIGN KEY (asignado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
           UNIQUE KEY unique_proyecto_responsable (proyecto_id, usuario_id)
-        );
-
-        -- Tabla de Tareas
-        CREATE TABLE IF NOT EXISTS tareas (
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS tareas (
           id INT AUTO_INCREMENT PRIMARY KEY,
           titulo VARCHAR(150) NOT NULL,
           descripcion TEXT,
-          fecha_inicio DATE,
-          fecha_fin DATE,
-          estado ENUM('pendiente', 'en_progreso', 'completada', 'cancelada') DEFAULT 'pendiente',
-          prioridad ENUM('baja', 'media', 'alta') DEFAULT 'media',
           proyecto_id INT NOT NULL,
           usuario_asignado_id INT,
+          estado ENUM('pendiente', 'en_progreso', 'completada', 'cancelada') DEFAULT 'pendiente',
+          prioridad ENUM('baja', 'media', 'alta', 'critica') DEFAULT 'media',
+          fecha_inicio DATE,
+          fecha_fin DATE,
+          fecha_limite DATE,
+          porcentaje_completado DECIMAL(5,2) DEFAULT 0.00,
+          tiempo_estimado INT,
+          tiempo_real INT,
+          padre_tarea_id INT,
           creado_por INT NOT NULL,
-          padre_tarea_id INT DEFAULT NULL,
-          porcentaje_completado TINYINT DEFAULT 0,
-          horas_trabajadas DECIMAL(5,2) DEFAULT 0.00,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE,
@@ -153,10 +150,9 @@ class DatabaseHelper {
           FOREIGN KEY (creado_por) REFERENCES usuarios(id),
           FOREIGN KEY (padre_tarea_id) REFERENCES tareas(id) ON DELETE SET NULL,
           CONSTRAINT chk_porcentaje_completado CHECK (porcentaje_completado >= 0 AND porcentaje_completado <= 100)
-        );
-
-        -- Tabla de Refresh Tokens
-        CREATE TABLE IF NOT EXISTS refresh_tokens (
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS refresh_tokens (
           id INT AUTO_INCREMENT PRIMARY KEY,
           token VARCHAR(500) NOT NULL UNIQUE,
           usuario_id INT NOT NULL,
@@ -165,20 +161,18 @@ class DatabaseHelper {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-        );
-
-        -- Tabla de Token Blacklist
-        CREATE TABLE IF NOT EXISTS token_blacklist (
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS token_blacklist (
           id INT AUTO_INCREMENT PRIMARY KEY,
           token_jti VARCHAR(255) NOT NULL UNIQUE,
           usuario_id INT NOT NULL,
           expires_at TIMESTAMP NOT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-        );
-
-        -- Tabla de Logs de Actividad
-        CREATE TABLE IF NOT EXISTS logs_actividad (
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS logs_actividad (
           id INT AUTO_INCREMENT PRIMARY KEY,
           usuario_id INT,
           accion VARCHAR(100) NOT NULL,
@@ -189,16 +183,22 @@ class DatabaseHelper {
           user_agent TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
-        );
+        )`
+      ];
 
-        -- Insertar roles básicos si no existen
+      // Ejecutar cada tabla por separado
+      for (const tableSQL of tables) {
+        await this.connection.execute(tableSQL);
+      }
+
+      // Insertar roles básicos
+      await this.connection.execute(`
         INSERT IGNORE INTO roles (nombre) VALUES 
         ('admin'),
         ('responsable_proyecto'),
-        ('responsable_tarea');
-      `;
+        ('responsable_tarea')
+      `);
 
-      await this.connection.execute(createTablesSQL);
       this.logger.success('Tablas creadas/verificadas exitosamente');
 
     } catch (error) {

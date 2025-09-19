@@ -46,9 +46,8 @@ describe('Users Integration Tests', () => {
   });
 
   describe('GET /api/users/profile', () => {
-    const profileEndpoint = config.getEndpoint('users', 'profile');
-
     test('Debe obtener perfil del usuario autenticado', async () => {
+      const profileEndpoint = config.getEndpoint('users', 'profile');
       logger.info('Test: Obtener perfil propio');
       
       const userData = config.getTestData('users', 'regular');
@@ -102,9 +101,8 @@ describe('Users Integration Tests', () => {
   });
 
   describe('PUT /api/users/profile', () => {
-    const profileEndpoint = config.getEndpoint('users', 'profile');
-
     test('Debe actualizar perfil exitosamente', async () => {
+      const profileEndpoint = config.getEndpoint('users', 'profile');
       logger.info('Test: Actualización de perfil exitosa');
       
       const { headers } = await authHelper.createUserAndGetToken();
@@ -180,9 +178,8 @@ describe('Users Integration Tests', () => {
   });
 
   describe('GET /api/users', () => {
-    const usersEndpoint = config.getEndpoint('users', 'list');
-
     test('Debe listar usuarios como administrador', async () => {
+      const usersEndpoint = config.getEndpoint('users', 'list');
       logger.info('Test: Listar usuarios como admin');
       
       // Crear admin

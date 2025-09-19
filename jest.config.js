@@ -38,5 +38,10 @@ module.exports = {
   maxWorkers: 1,
   
   // Verbose para ver detalles
-  verbose: true
+  verbose: true,
+  
+  // Configuración adicional para debugging
+  silent: false,
+  detectOpenHandles: false,
+  forceExit: true
 };

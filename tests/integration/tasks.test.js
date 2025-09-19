@@ -46,9 +46,8 @@ describe('Tasks Integration Tests', () => {
   });
 
   describe('GET /api/tasks', () => {
-    const tasksEndpoint = config.getEndpoint('tasks', 'list');
-
     test('Debe listar tareas como administrador', async () => {
+      const tasksEndpoint = config.getEndpoint('tasks', 'list');
       logger.info('Test: Listar tareas como admin');
       
       const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();
@@ -197,9 +196,8 @@ describe('Tasks Integration Tests', () => {
   });
 
   describe('POST /api/tasks', () => {
-    const tasksEndpoint = config.getEndpoint('tasks', 'create');
-
     test('Debe crear tarea exitosamente como admin', async () => {
+      const tasksEndpoint = config.getEndpoint('tasks', 'create');
       logger.info('Test: Crear tarea como admin');
       
       const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();

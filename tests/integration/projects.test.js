@@ -46,9 +46,8 @@ describe('Projects Integration Tests', () => {
   });
 
   describe('GET /api/projects', () => {
-    const projectsEndpoint = config.getEndpoint('projects', 'list');
-
     test('Debe listar proyectos como administrador', async () => {
+      const projectsEndpoint = config.getEndpoint('projects', 'list');
       logger.info('Test: Listar proyectos como admin');
       
       const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();
@@ -165,9 +164,8 @@ describe('Projects Integration Tests', () => {
   });
 
   describe('POST /api/projects', () => {
-    const projectsEndpoint = config.getEndpoint('projects', 'create');
-
     test('Debe crear proyecto exitosamente como admin', async () => {
+      const projectsEndpoint = config.getEndpoint('projects', 'create');
       logger.info('Test: Crear proyecto como admin');
       
       const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();

@@ -13,7 +13,7 @@ const app = require('../../src/app');
 const DatabaseHelper = require('../utils/DatabaseHelper');
 const AuthHelper = require('../utils/AuthHelper');
 const TestLogger = require('../utils/TestLogger');
-const TestConfig = require('../utils/TestConfig');
+const { TestConfig, getTestConfig } = require('../utils/TestConfig');
 
 describe('Dashboard Integration Tests', () => {
   let dbHelper;
