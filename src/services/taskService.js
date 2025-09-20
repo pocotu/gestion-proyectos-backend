@@ -147,6 +147,14 @@ class TaskService {
         }
       }
 
+      // Si se está asignando a un usuario, verificar que existe
+      if (taskData.usuario_asignado_id && taskData.usuario_asignado_id !== existingTask.usuario_asignado_id) {
+        const userExists = await this.taskRepository.userExists(taskData.usuario_asignado_id);
+        if (!userExists) {
+          throw new Error('El usuario especificado no existe');
+        }
+      }
+
       const updatedTask = await this.taskRepository.updateTask(id, taskData);
       return updatedTask;
     } catch (error) {
@@ -162,7 +170,18 @@ class TaskService {
     try {
       console.log('TaskService.deleteTask - Iniciando eliminación:', { taskId, userId, isAdmin });
 
-      // Si es admin, puede eliminar cualquier tarea
+      // Obtener la tarea para verificar su estado
+      const task = await this.taskRepository.findById(taskId);
+      if (!task) {
+        throw new Error('Tarea no encontrada');
+      }
+
+      // Validar que no se pueda eliminar una tarea en progreso
+      if (task.estado === 'en_progreso') {
+        throw new Error('No se puede eliminar una tarea que está en progreso');
+      }
+
+      // Si es admin, puede eliminar cualquier tarea (excepto las en progreso)
       if (!isAdmin) {
         // Verificar si el usuario tiene acceso a la tarea
         const hasAccess = await this.taskRepository.hasUserAccess(taskId, userId);
@@ -611,6 +630,24 @@ class TaskService {
   }
 
   /**
+   * Obtener tareas asignadas a un usuario específico
+   */
+  async getTasksByUser(userId, filters = {}) {
+    try {
+      console.log('TaskService.getTasksByUser - Iniciando con parámetros:', { userId, filters });
+      
+      const tasks = await this.taskRepository.findByUser(userId, filters.estado);
+      
+      console.log('TaskService.getTasksByUser - Tareas obtenidas:', tasks.length);
+      
+      return tasks;
+    } catch (error) {
+      console.error('Error en TaskService.getTasksByUser:', error);
+      throw new Error('Error obteniendo tareas del usuario');
+    }
+  }
+
+  /**
    * Verificar si un usuario puede gestionar una tarea específica
    * Un usuario puede gestionar una tarea si:
    * - Es administrador
@@ -633,14 +670,8 @@ class TaskService {
   async userCanManageProject(userId, projectId) {
     try {
       // Verificar si es responsable del proyecto usando el repositorio
-      const result = await this.projectResponsibleRepository.db('proyecto_responsables')
-        .select('1')
-        .where('proyecto_id', projectId)
-        .where('usuario_id', userId)
-        .where('activo', true)
-        .first();
-
-      return !!result;
+      const result = await this.projectResponsibleRepository.isUserResponsible(projectId, userId);
+      return result;
     } catch (error) {
       console.error('Error en TaskService.userCanManageProject:', error);
       return false;
@@ -708,6 +739,42 @@ class TaskService {
     } catch (error) {
       console.error('Error en TaskService.getPendingTasks:', error);
       throw new Error('Error obteniendo tareas pendientes');
+    }
+  }
+
+  /**
+   * Obtener archivos de una tarea
+   */
+  async getTaskFiles(taskId, options = {}) {
+    try {
+      const FileService = require('./fileService');
+      const fileService = new FileService();
+      
+      // Proporcionar valores por defecto para la paginación
+      const paginationOptions = {
+        page: options.page || 1,
+        limit: options.limit || 10,
+        userId: options.userId || null,
+        isAdmin: options.isAdmin || false
+      };
+      
+      const result = await fileService.getFilesByTask(taskId, paginationOptions);
+      return result.files || [];
+    } catch (error) {
+      console.error('Error en TaskService.getTaskFiles:', error);
+      throw new Error('Error obteniendo archivos de la tarea');
+    }
+  }
+
+  /**
+   * Verificar si un usuario tiene acceso a una tarea
+   */
+  async userHasAccessToTask(userId, taskId) {
+    try {
+      return await this.taskRepository.hasUserAccess(taskId, userId);
+    } catch (error) {
+      console.error('Error en TaskService.userHasAccessToTask:', error);
+      return false;
     }
   }
 }

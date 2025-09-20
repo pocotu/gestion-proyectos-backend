@@ -323,6 +323,59 @@ class UserRepository extends BaseRepository {
   }
 
   /**
+   * Buscar usuarios por nombre o email
+   */
+  async searchUsers(query, options = {}) {
+    try {
+      const { limit = 10, offset = 0 } = options;
+      const { pool } = require('../config/db');
+      
+      // Asegurar que limit y offset sean números enteros
+      const limitInt = parseInt(limit, 10);
+      const offsetInt = parseInt(offset, 10);
+      
+      const searchQuery = `
+        SELECT * FROM usuarios 
+        WHERE (nombre LIKE ? OR email LIKE ?) 
+        AND estado = 1
+        ORDER BY nombre ASC 
+        LIMIT ? OFFSET ?
+      `;
+      
+      const searchPattern = `%${query}%`;
+      const [rows] = await pool.execute(searchQuery, [searchPattern, searchPattern, limitInt, offsetInt]);
+      
+      return rows;
+    } catch (error) {
+      console.error('Error en UserRepository.searchUsers:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Contar resultados de búsqueda
+   */
+  async countSearchResults(query) {
+    try {
+      const { pool } = require('../config/db');
+      
+      const countQuery = `
+        SELECT COUNT(*) as total FROM usuarios 
+        WHERE (nombre LIKE ? OR email LIKE ?) 
+        AND estado = 1
+      `;
+      
+      const searchPattern = `%${query}%`;
+      const [rows] = await pool.execute(countQuery, [searchPattern, searchPattern]);
+      
+      return rows[0].total;
+    } catch (error) {
+      console.error('Error en UserRepository.countSearchResults:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Verifica las credenciales de un usuario
    */
   async verifyCredentials(email, contraseña) {

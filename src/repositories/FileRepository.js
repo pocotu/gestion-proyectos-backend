@@ -91,8 +91,10 @@ class FileRepository extends BaseRepository {
   /**
    * Obtiene todos los archivos de una tarea
    */
-  async findByTask(tarea_id) {
-    return await this
+  async findByTask(tarea_id, options = {}) {
+    const { limit, offset, userId, isAdmin } = options;
+    
+    let query = this
       .select(`
         archivos.*,
         proyectos.titulo as proyecto_titulo,
@@ -102,8 +104,17 @@ class FileRepository extends BaseRepository {
       .leftJoin('proyectos', 'archivos.proyecto_id', 'proyectos.id')
       .leftJoin('usuarios', 'archivos.subido_por', 'usuarios.id')
       .where('archivos.tarea_id', tarea_id)
-      .orderBy('archivos.created_at', 'DESC')
-      .get();
+      .orderBy('archivos.created_at', 'DESC');
+    
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    if (offset) {
+      query = query.offset(offset);
+    }
+    
+    return await query.get();
   }
 
   /**
@@ -593,6 +604,17 @@ class FileRepository extends BaseRepository {
       .orderBy('archivos.created_at', 'DESC')
       .limit(limit)
       .get();
+  }
+
+  /**
+   * Cuenta archivos de una tarea
+   */
+  async countByTask(tarea_id, userId = null, isAdmin = false) {
+    const result = await this
+      .where('archivos.tarea_id', tarea_id)
+      .count();
+    
+    return result;
   }
 }
 

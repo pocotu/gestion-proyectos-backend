@@ -36,16 +36,13 @@ class UserRoleRepository extends BaseRepository {
   }
 
   /**
-   * Remueve un rol de un usuario (soft delete)
+   * Remueve un rol de un usuario (eliminación permanente)
    */
   async removeRole(usuario_id, rol_id) {
     return await this
       .where('usuario_id', usuario_id)
       .where('rol_id', rol_id)
-      .update({
-        activo: false,
-        updated_at: new Date()
-      });
+      .delete();
   }
 
   /**

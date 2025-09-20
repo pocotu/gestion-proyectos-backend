@@ -289,12 +289,8 @@ class RoleService {
     try {
       console.log('getUserRoles - Iniciando con userId:', userId);
       
-      // Verificar que el usuario existe usando el repositorio
-      const user = await this.userRepository.db('usuarios')
-        .select('id', 'nombre', 'email')
-        .where('id', userId)
-        .where('estado', 'activo')
-        .first();
+      // Verificar que el usuario existe usando el repositorio base
+      const user = await this.userRepository.findById(userId);
       
       if (!user) {
         throw new Error('Usuario no encontrado');
@@ -307,23 +303,13 @@ class RoleService {
 
       console.log('getUserRoles - Roles obtenidos:', roles.length);
 
-      return {
-        success: true,
-        message: 'Roles obtenidos exitosamente',
-        data: {
-          userId,
-          userName: user.nombre,
-          userEmail: user.email,
-          roles: roles.map(role => ({
-            id: role.rol_id,
-            name: role.rol_nombre,
-            assignedAt: role.fecha_asignacion,
-            assignedBy: role.asignado_por
-          })),
-          roleCount: roles.length,
-          roleNames: roles.map(role => role.rol_nombre)
-        }
-      };
+      return roles.map(role => ({
+        id: role.id,
+        usuario_id: role.usuario_id,
+        rol_id: role.rol_id,
+        rol_nombre: role.rol_nombre,
+        created_at: role.created_at
+      }));
 
     } catch (error) {
       console.error('getUserRoles - Error completo:', error);

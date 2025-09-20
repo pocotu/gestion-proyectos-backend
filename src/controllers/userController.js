@@ -455,24 +455,27 @@ class UserController {
   /**
    * Buscar usuarios
    * GET /api/users/search
-   * Permisos: Admin o usuarios con permiso de lectura de usuarios
+   * Permisos: Admin
    */
   async searchUsers(req, res) {
     try {
-      const { query, limit = 10, offset = 0 } = req.query;
-      
-      if (!query) {
+      const { q: query, page = 1, limit = 10 } = req.query;
+
+      if (!query || query.trim().length === 0) {
         return res.status(400).json({
           success: false,
-          message: 'Se requiere un término de búsqueda'
+          message: 'Parámetro de búsqueda requerido'
         });
       }
 
-      const users = await this.userService.searchUsers(query, { limit, offset });
+      const result = await this.userService.searchUsers(query.trim(), {
+        page: parseInt(page),
+        limit: parseInt(limit)
+      });
 
       res.json({
         success: true,
-        data: { users }
+        data: result
       });
 
     } catch (error) {

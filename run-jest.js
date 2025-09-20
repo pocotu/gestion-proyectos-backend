@@ -1,1 +1,0 @@
-const { execSync } = require('child_process'); try { const output = execSync('node ./node_modules/jest/bin/jest.js tests/integration/users.test.js --verbose', {encoding: 'utf8', stdio: 'pipe'}); console.log(output); } catch(e) { console.error('STDOUT:', e.stdout); console.error('STDERR:', e.stderr); console.error('STATUS:', e.status); }

@@ -66,11 +66,14 @@ describe('Auth Integration Tests', () => {
         success: true,
         message: expect.stringContaining('registrado'),
         data: {
-          user: {
-            id: expect.any(Number),
-            nombre: userData.nombre,
-            email: userData.email
-          }
+          id: expect.any(Number),
+          nombre: userData.nombre,
+          email: userData.email,
+          telefono: userData.telefono,
+          es_administrador: expect.any(Number),
+          estado: expect.any(Number),
+          created_at: expect.any(String),
+          updated_at: expect.any(String)
         }
       });
       

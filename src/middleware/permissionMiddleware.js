@@ -29,35 +29,36 @@ class PermissionMiddleware {
   requirePermission(permission) {
     return async (req, res, next) => {
       try {
-        console.log('requirePermission - Iniciando verificación para:', permission);
+        console.log('🔑 [PERMISSION-MIDDLEWARE] requirePermission - Iniciando verificación para:', permission);
         
         // Verificar que el usuario esté autenticado
         if (!req.user || !req.user.id) {
+          console.log('🔑 [PERMISSION-MIDDLEWARE] requirePermission - Usuario no autenticado');
           return res.status(401).json({
             success: false,
             message: 'Usuario no autenticado'
           });
         }
 
-        console.log('requirePermission - Usuario autenticado:', req.user.id, 'es_administrador:', req.user.es_administrador);
+        console.log('🔑 [PERMISSION-MIDDLEWARE] requirePermission - Usuario autenticado:', req.user.id, 'es_administrador:', req.user.es_administrador);
 
         // Admin siempre tiene todos los permisos
         if (req.user.es_administrador) {
-          console.log('requirePermission - Usuario es admin, acceso permitido');
-          next();
-          return;
+          console.log('🔑 [PERMISSION-MIDDLEWARE] requirePermission - Usuario es admin, acceso permitido');
+          console.log('🔑 [PERMISSION-MIDDLEWARE] requirePermission - Llamando next() para admin');
+          return next();
         }
 
         // Obtener roles del usuario usando método estático
-        console.log('requirePermission - Obteniendo roles del usuario');
+        console.log('🔑 [PERMISSION-MIDDLEWARE] requirePermission - Obteniendo roles del usuario');
         const userRoles = await UserRoleRepository.getUserRolesStatic(req.user.id);
         const userRoleNames = userRoles.map(role => role.rol_nombre);
         
-        console.log('requirePermission - Roles del usuario:', userRoleNames);
+        console.log('🔑 [PERMISSION-MIDDLEWARE] requirePermission - Roles del usuario:', userRoleNames);
 
         // Verificar si el usuario tiene el permiso
         const hasPermission = userHasPermission(userRoleNames, permission);
-        console.log('requirePermission - ¿Tiene permiso?', hasPermission);
+        console.log('🔑 [PERMISSION-MIDDLEWARE] requirePermission - ¿Tiene permiso?', hasPermission);
         
         if (!hasPermission) {
           return res.status(403).json({
@@ -73,11 +74,11 @@ class PermissionMiddleware {
         req.userPermissions = getUserPermissions(userRoleNames);
         req.hasPermission = (perm) => userHasPermission(userRoleNames, perm);
 
-        console.log('requirePermission - Acceso permitido');
+        console.log('🔑 [PERMISSION-MIDDLEWARE] requirePermission - Acceso permitido');
         next();
 
       } catch (error) {
-        console.error('requirePermission - Error completo:', error);
+        console.error('🔑 [PERMISSION-MIDDLEWARE] requirePermission - Error completo:', error);
         console.error('requirePermission - Stack:', error.stack);
         return res.status(500).json({
           success: false,
@@ -155,7 +156,10 @@ class PermissionMiddleware {
    * Admin: Acceso total, gestión de usuarios y roles
    */
   requireUserManagement() {
-    return this.requirePermission(PERMISSIONS.USERS.MANAGE_ROLES);
+    console.log('🔑 [PERMISSION-MIDDLEWARE] requireUserManagement - Iniciando');
+    const result = this.requirePermission(PERMISSIONS.USERS.MANAGE_ROLES);
+    console.log('🔑 [PERMISSION-MIDDLEWARE] requireUserManagement - Retornando middleware');
+    return result;
   }
 
   /**
@@ -322,7 +326,9 @@ class PermissionMiddleware {
           console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Usuario es administrador');
           req.userRoles = [{ nombre: 'admin' }];
           req.userPermissions = ['*']; // Todos los permisos
-          return next();
+          console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Llamando next() para admin');
+          next();
+          return;
         }
 
         console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Usuario no es admin, obteniendo roles...');
@@ -334,18 +340,10 @@ class PermissionMiddleware {
           
           req.userRoles = userRoles;
 
-          // Obtener permisos basados en roles
-          const permissions = [];
-          for (const role of userRoles) {
-            try {
-              const rolePermissions = await this.rolePermissionRepository.getRolePermissions(role.rol_id);
-              console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Permisos del rol', role.rol_nombre, ':', rolePermissions);
-              permissions.push(...rolePermissions);
-            } catch (roleError) {
-              console.error('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Error obteniendo permisos del rol:', roleError.message);
-            }
-          }
-
+          // Obtener permisos basados en roles usando el sistema de permisos
+          const roleNames = userRoles.map(role => role.rol_nombre);
+          const permissions = getUserPermissions(roleNames);
+          
           req.userPermissions = permissions;
           console.log('🔑 [PERMISSION-MIDDLEWARE] attachPermissions - Permisos finales:', permissions);
 

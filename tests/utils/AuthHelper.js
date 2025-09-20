@@ -24,9 +24,11 @@ class AuthHelper {
    */
   async createTestUser(userData = {}) {
     try {
+      // Usar timestamp para emails únicos si no se proporciona uno
+      const timestamp = Date.now();
       const defaultUser = {
         nombre: 'Usuario Test',
-        email: 'test@example.com',
+        email: `test${timestamp}@example.com`,
         contraseña: 'password123',
         telefono: '1234567890',
         es_administrador: false,
@@ -37,8 +39,9 @@ class AuthHelper {
       
       this.logger.info('Creando usuario de prueba', { email: user.email });
 
-      // Hash de la contraseña
-      const hashedPassword = await bcrypt.hash(user.contraseña, 10);
+      // Hash de la contraseña con menos rounds para tests
+      const saltRounds = process.env.NODE_ENV === 'test' ? 4 : 10;
+      const hashedPassword = await bcrypt.hash(user.contraseña, saltRounds);
 
       // Insertar usuario en base de datos
       const [result] = await this.db.connection.execute(
@@ -75,9 +78,11 @@ class AuthHelper {
    * Crear usuario administrador de prueba
    */
   async createTestAdmin(userData = {}) {
+    // Usar un email único basado en timestamp para evitar conflictos
+    const timestamp = Date.now();
     const adminData = {
       nombre: 'Admin Test',
-      email: 'admin@example.com',
+      email: `admin${timestamp}@example.com`,
       contraseña: 'admin123',
       es_administrador: true,
       ...userData
@@ -237,23 +242,58 @@ class AuthHelper {
    */
   async createMultipleTestUsers(count = 3) {
     try {
-      this.logger.info(`Creando ${count} usuarios de prueba`);
+      this.logger.info('Creando múltiples usuarios de prueba', { count });
       
       const users = [];
-      for (let i = 1; i <= count; i++) {
-        const user = await this.createTestUser({
-          nombre: `Usuario Test ${i}`,
-          email: `test${i}@example.com`,
-          contraseña: `password${i}23`
-        });
+      for (let i = 0; i < count; i++) {
+        const userData = {
+          nombre: `Usuario Test ${i + 1}`,
+          email: `test${Date.now()}_${i}@example.com`,
+          contraseña: 'password123'
+        };
+        
+        const user = await this.createTestUser(userData);
         users.push(user);
       }
-
-      this.logger.success(`${count} usuarios de prueba creados exitosamente`);
+      
+      this.logger.success('Múltiples usuarios creados exitosamente', { count });
       return users;
-
+      
     } catch (error) {
       this.logger.error('Error al crear múltiples usuarios', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear usuario con rol específico y obtener token
+   */
+  async createUserWithRoleAndGetToken(userData = {}, roleName = 'responsable_proyecto') {
+    try {
+      this.logger.info('Creando usuario con rol y token', { roleName });
+      
+      // Crear usuario
+      const user = await this.createTestUser(userData);
+      
+      // Asignar rol al usuario
+      await this.assignRoleToUser(user.id, roleName);
+      
+      // Generar token
+      const token = this.generateToken(user);
+      
+      this.logger.success('Usuario con rol y token creado exitosamente', { 
+        userId: user.id, 
+        roleName 
+      });
+      
+      return { 
+        user, 
+        token,
+        headers: this.getAuthHeaders(token)
+      };
+      
+    } catch (error) {
+      this.logger.error('Error al crear usuario con rol y token', error);
       throw error;
     }
   }

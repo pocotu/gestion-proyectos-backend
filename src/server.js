@@ -30,7 +30,8 @@ async function start() {
 
 // Handle unexpected errors gracefully
 process.on('uncaughtException', (err) => {
-  logger.error('Uncaught Exception: %s', err.message, { stack: err.stack });
+  logger.error('Uncaught Exception:', err.message, { stack: err.stack });
+  console.error('Uncaught Exception:', err);
   // attempt graceful shutdown
   if (server && server.close) server.close(() => process.exit(1));
   else process.exit(1);

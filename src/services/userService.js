@@ -61,7 +61,7 @@ class UserService {
       const user = await this.userRepository.findById(id);
       
       if (!user) {
-        throw new Error('Usuario no encontrado');
+        return null; // Retornar null en lugar de lanzar error
       }
 
       return this.sanitizeUser(user);
@@ -135,11 +135,11 @@ class UserService {
     try {
       const user = await this.userRepository.findById(id);
       if (!user) {
-        throw new Error('Usuario no encontrado');
+        return false; // Retornar false en lugar de lanzar error
       }
 
-      await this.userRepository.delete(id);
-      return { message: 'Usuario eliminado correctamente' };
+      await this.userRepository.hardDelete(id);
+      return true;
     } catch (error) {
       console.error('Error en UserService.deleteUser:', error);
       throw error;
@@ -212,30 +212,7 @@ class UserService {
     }
   }
 
-  /**
-   * Buscar usuarios
-   */
-  async searchUsers(query, { page = 1, limit = config.DEFAULT_PAGINATION_LIMIT }) {
-    try {
-      const offset = (page - 1) * limit;
-      
-      const users = await this.userRepository.search(query, { limit, offset });
-      const total = await this.userRepository.countSearch(query);
 
-      return {
-        users: users.map(user => this.sanitizeUser(user)),
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(total / limit),
-          totalItems: total,
-          itemsPerPage: limit
-        }
-      };
-    } catch (error) {
-      console.error('Error en UserService.searchUsers:', error);
-      throw new Error('Error buscando usuarios');
-    }
-  }
 
   /**
    * Obtener estadísticas de usuarios
@@ -277,15 +254,41 @@ class UserService {
   }
 
   /**
-   * Obtener roles del usuario
+   * Obtener roles de un usuario
    */
   async getUserRoles(userId) {
     try {
-      const roles = await this.userRepository.getUserRoles(userId);
-      return roles;
+      const roles = await this.roleService.getUserRoles(userId);
+      return roles || [];
     } catch (error) {
       console.error('Error en UserService.getUserRoles:', error);
-      throw new Error('Error obteniendo roles del usuario');
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar usuarios
+   */
+  async searchUsers(query, options = {}) {
+    try {
+      const { page = 1, limit = 10 } = options;
+      const offset = (page - 1) * limit;
+      
+      const users = await this.userRepository.searchUsers(query, { limit, offset });
+      const total = await this.userRepository.countSearchResults(query);
+      
+      return {
+        users: users.map(user => this.sanitizeUser(user)),
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(total / limit),
+          totalItems: total,
+          itemsPerPage: limit
+        }
+      };
+    } catch (error) {
+      console.error('Error en UserService.searchUsers:', error);
+      throw error;
     }
   }
 

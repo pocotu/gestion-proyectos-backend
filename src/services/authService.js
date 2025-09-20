@@ -32,14 +32,22 @@ class AuthService {
    */
   async register(userData) {
     try {
+      console.log('🟢 [AUTH-SERVICE] register - Iniciando registro');
+      console.log('🟢 [AUTH-SERVICE] register - userData:', userData);
+      
       // Validar que el email no exista
+      console.log('🟢 [AUTH-SERVICE] register - Verificando email existente');
       const existingUser = await this.userRepository.findByEmail(userData.email);
       if (existingUser) {
+        console.log('🟢 [AUTH-SERVICE] register - Email ya existe');
         throw new Error('El email ya está registrado');
       }
+      console.log('🟢 [AUTH-SERVICE] register - Email disponible');
 
       // Validar datos requeridos
+      console.log('🟢 [AUTH-SERVICE] register - Validando datos');
       this._validateUserData(userData);
+      console.log('🟢 [AUTH-SERVICE] register - Datos válidos');
 
       // Crear usuario (UserRepository se encarga del hash de la contraseña)
       const newUserData = {
@@ -47,13 +55,22 @@ class AuthService {
         es_administrador: userData.es_administrador || false
       };
 
+      console.log('🟢 [AUTH-SERVICE] register - Creando usuario en BD');
       const result = await this.userRepository.create(newUserData);
+      console.log('🟢 [AUTH-SERVICE] register - Usuario creado con ID:', result.id);
       
       // Obtener usuario creado sin contraseña
+      console.log('🟢 [AUTH-SERVICE] register - Obteniendo usuario creado');
       const createdUser = await this.userRepository.findById(result.id);
-      return this._sanitizeUser(createdUser);
+      console.log('🟢 [AUTH-SERVICE] register - Usuario obtenido');
+      
+      const sanitizedUser = this._sanitizeUser(createdUser);
+      console.log('🟢 [AUTH-SERVICE] register - Usuario sanitizado, retornando');
+      return sanitizedUser;
 
     } catch (error) {
+      console.error('🟢 [AUTH-SERVICE] register - Error:', error.message);
+      console.error('🟢 [AUTH-SERVICE] register - Stack:', error.stack);
       throw new Error(`Error en registro: ${error.message}`);
     }
   }

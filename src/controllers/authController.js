@@ -19,58 +19,44 @@ class AuthController {
    * POST /api/auth/register
    */
   async register(req, res) {
+    console.log('🎯 [AUTH-CONTROLLER] register - INICIANDO CONTROLADOR');
+    console.log('🎯 [AUTH-CONTROLLER] register - req.body:', req.body);
+    
     try {
       const { nombre, email, contraseña, telefono, es_administrador } = req.body;
 
       // Validar datos requeridos
       if (!nombre || !email || !contraseña) {
+        console.log('🎯 [AUTH-CONTROLLER] register - Datos faltantes');
         return res.status(400).json({
           success: false,
           message: 'Nombre, email y contraseña son requeridos'
         });
       }
 
-      const userData = {
-        nombre: nombre.trim(),
-        email: email.toLowerCase().trim(),
+      console.log('🎯 [AUTH-CONTROLLER] register - Llamando authService.register');
+      const user = await this.authService.register({
+        nombre,
+        email,
         contraseña,
-        telefono: telefono?.trim() || null,
-        es_administrador: es_administrador || false
-      };
+        telefono,
+        es_administrador
+      });
 
-      const user = await this.authService.register(userData);
-
+      console.log('🎯 [AUTH-CONTROLLER] register - Usuario creado exitosamente');
       res.status(201).json({
         success: true,
         message: 'Usuario registrado exitosamente',
-        data: {
-          user
-        }
+        data: user
       });
+      console.log('🎯 [AUTH-CONTROLLER] register - Respuesta enviada');
 
     } catch (error) {
-      console.error('Error en registro:', error);
-      
-      // Manejar errores específicos
-      if (error.message.includes('email ya está registrado')) {
-        return res.status(409).json({
-          success: false,
-          message: error.message
-        });
-      }
-
-      if (error.message.includes('Nombre debe') || 
-          error.message.includes('Email inválido') || 
-          error.message.includes('Contraseña debe')) {
-        return res.status(400).json({
-          success: false,
-          message: error.message
-        });
-      }
-
-      res.status(500).json({
+      console.error('🎯 [AUTH-CONTROLLER] register - Error:', error.message);
+      console.error('🎯 [AUTH-CONTROLLER] register - Stack:', error.stack);
+      res.status(400).json({
         success: false,
-        message: 'Error interno del servidor'
+        message: error.message
       });
     }
   }

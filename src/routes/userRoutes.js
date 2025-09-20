@@ -51,6 +51,26 @@ router.put('/settings', userController.updateUserSettings.bind(userController));
 router.post('/settings/reset', userController.resetUserSettings.bind(userController));
 
 /**
+ * Rutas estáticas (DEBEN IR ANTES QUE LAS DINÁMICAS)
+ */
+
+// Buscar usuarios
+// GET /api/users/search
+// Permisos: Admin o usuarios con permiso de lectura de usuarios
+router.get('/search', 
+  requirePermission('users', 'read'),
+  userController.searchUsers.bind(userController)
+);
+
+// Obtener estadísticas de usuarios
+// GET /api/users/stats/overview
+// Permisos: Admin o usuarios con permiso de lectura de usuarios
+router.get('/stats/overview', 
+  requirePermission('users', 'read'),
+  userController.getUserStats.bind(userController)
+);
+
+/**
  * Rutas que requieren permisos de gestión de usuarios
  */
 
@@ -66,7 +86,7 @@ router.get('/',
 // POST /api/users
 // Permisos: Solo Admin
 router.post('/', 
-  requireUserManagement,
+  requireUserManagement(),
   authController.register.bind(authController)
 );
 
@@ -128,26 +148,6 @@ router.delete('/:id/roles/:roleId',
 router.get('/:id/roles', 
   requireOwnershipOrPermission('users', 'read'),
   userController.getUserRoles.bind(userController)
-);
-
-/**
- * Rutas de estadísticas y reportes
- */
-
-// Obtener estadísticas de usuarios
-// GET /api/users/stats/overview
-// Permisos: Admin o usuarios con permiso de lectura de usuarios
-router.get('/stats/overview', 
-  requirePermission('users', 'read'),
-  userController.getUserStats.bind(userController)
-);
-
-// Buscar usuarios
-// GET /api/users/search
-// Permisos: Admin o usuarios con permiso de lectura de usuarios
-router.get('/search', 
-  requirePermission('users', 'read'),
-  userController.searchUsers.bind(userController)
 );
 
 /**

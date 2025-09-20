@@ -347,7 +347,7 @@ class ProjectController {
         });
       }
 
-      const updatedProject = await this.projectService.updateProject(projectId, { estado });
+      const updatedProject = await this.projectService.updateProject(projectId, { estado }, userId, isAdmin);
 
       if (!updatedProject) {
         return res.status(404).json({
@@ -836,8 +836,10 @@ class ProjectController {
 
       res.json({
         success: true,
-        projects: result.projects,
-        pagination: result.pagination
+        data: {
+          projects: result.projects,
+          pagination: result.pagination
+        }
       });
     } catch (error) {
       console.error('🔍 [CONTROLLER] getMyProjects - Error:', error);

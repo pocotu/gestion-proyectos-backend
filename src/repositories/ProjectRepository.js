@@ -295,9 +295,7 @@ class ProjectRepository extends BaseRepository {
       fecha_inicio: fecha_inicio || null,
       fecha_fin: fecha_fin || null,
       creado_por: creado_por,
-      estado: estado || 'planificacion',
-      created_at: new Date(),
-      updated_at: new Date()
+      estado: estado || 'planificacion'
     };
 
     console.log('ProjectRepository.create - datos a insertar:', data);
@@ -692,9 +690,9 @@ class ProjectRepository extends BaseRepository {
           u.nombre as asignado_a_nombre,
           u.email as asignado_a_email
         FROM tareas t
-        LEFT JOIN usuarios u ON t.asignado_a = u.id
+        LEFT JOIN usuarios u ON t.usuario_asignado_id = u.id
         WHERE t.proyecto_id = ?
-        ORDER BY t.fecha_creacion DESC
+        ORDER BY t.created_at DESC
       `;
       
       const [rows] = await pool.execute(query, [projectId]);

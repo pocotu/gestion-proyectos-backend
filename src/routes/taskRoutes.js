@@ -32,6 +32,92 @@ router.get('/',
   taskController.getAllTasks.bind(taskController)
 );
 
+// Obtener mis tareas asignadas (DEBE IR ANTES DE /:id)
+// GET /api/tasks/my
+// Permisos: Usuario autenticado (sus propias tareas)
+router.get('/my', 
+  taskController.getMyTasks.bind(taskController)
+);
+
+/**
+ * Rutas de estadísticas y reportes (DEBEN IR ANTES QUE LAS RUTAS DINÁMICAS)
+ */
+
+// Obtener estadísticas de tareas
+// GET /api/tasks/stats
+// Permisos: Admin o filtrado según acceso del usuario
+router.get('/stats', 
+  requirePermission(['admin', 'responsable_proyecto']),
+  taskController.getTaskStats.bind(taskController)
+);
+
+// Obtener estadísticas de mis tareas
+// GET /api/tasks/stats/my-stats
+// Permisos: Usuario autenticado (sus propias estadísticas)
+router.get('/stats/my-stats', 
+  (req, res, next) => {
+    req.query.user_specific = 'true';
+    next();
+  },
+  taskController.getTaskStats.bind(taskController)
+);
+
+// Obtener tareas vencidas
+// GET /api/tasks/overdue
+// Permisos: Filtrado según acceso del usuario
+router.get('/overdue', 
+  (req, res, next) => {
+    req.query.overdue = 'true';
+    next();
+  },
+  taskController.getAllTasks.bind(taskController)
+);
+
+/**
+ * Rutas específicas para usuarios (ANTES DE LAS RUTAS DINÁMICAS)
+ */
+
+// Obtener tareas donde soy responsable (a través de proyectos)
+// GET /api/tasks/managed-tasks
+// Permisos: Responsables de proyecto
+router.get('/managed-tasks', 
+  requirePermission('projects', 'read'),
+  (req, res, next) => {
+    // Modificar query para obtener tareas de proyectos gestionados
+    req.query.managed = 'true';
+    next();
+  },
+  taskController.getAllTasks.bind(taskController)
+);
+
+/**
+ * Rutas de búsqueda y filtrado (ANTES DE LAS RUTAS DINÁMICAS)
+ */
+
+// Buscar tareas
+// GET /api/tasks/search
+// Permisos: Filtrado según acceso del usuario
+router.get('/search', 
+  (req, res, next) => {
+    // Agregar filtros de búsqueda al query
+    const { q, estado, prioridad, proyecto_id } = req.query;
+    req.searchQuery = q;
+    next();
+  },
+  taskController.getAllTasks.bind(taskController)
+);
+
+// Obtener tareas por estado
+// GET /api/tasks/by-status/:status
+// Permisos: Filtrado según acceso del usuario
+router.get('/by-status/:status', 
+  (req, res, next) => {
+    req.query.estado = req.params.status;
+    next();
+  },
+  taskController.getAllTasks.bind(taskController)
+);
+
 // Crear nueva tarea
 // POST /api/tasks
 // Permisos: Solo responsables del proyecto y admin
@@ -69,9 +155,9 @@ router.delete('/:id',
  */
 
 // Cambiar estado de la tarea
-// PATCH /api/tasks/:id/status
+// PUT /api/tasks/:id/status
 // Permisos: Solo asignados, responsables del proyecto y admin
-router.patch('/:id/status', 
+router.put('/:id/status', 
   requireTaskAccess('update'),
   taskController.changeTaskStatus.bind(taskController)
 );
@@ -117,9 +203,9 @@ router.patch('/:id/cancel',
  */
 
 // Asignar tarea a usuario
-// PATCH /api/tasks/:id/assign
+// PUT /api/tasks/:id/assign
 // Permisos: Admin o Responsable del proyecto
-router.patch('/:id/assign', 
+router.put('/:id/assign', 
   requirePermission('tasks', 'update'),
   taskController.assignTask.bind(taskController)
 );
@@ -150,13 +236,6 @@ router.get('/:id/files',
 /**
  * Rutas específicas para usuarios
  */
-
-// Obtener mis tareas asignadas
-// GET /api/tasks/my-tasks
-// Permisos: Usuario autenticado (sus propias tareas)
-router.get('/my-tasks', 
-  taskController.getMyTasks.bind(taskController)
-);
 
 // Obtener tareas donde soy responsable (a través de proyectos)
 // GET /api/tasks/managed-tasks
@@ -216,39 +295,6 @@ router.get('/by-priority/:priority',
 router.get('/by-project/:projectId', 
   (req, res, next) => {
     req.query.proyecto_id = req.params.projectId;
-    next();
-  },
-  taskController.getAllTasks.bind(taskController)
-);
-
-/**
- * Rutas de estadísticas y reportes
- */
-
-// Obtener estadísticas de tareas
-// GET /api/tasks/stats/overview
-// Permisos: Admin o filtrado según acceso del usuario
-router.get('/stats/overview', 
-  taskController.getTaskStats.bind(taskController)
-);
-
-// Obtener estadísticas de mis tareas
-// GET /api/tasks/stats/my-stats
-// Permisos: Usuario autenticado (sus propias estadísticas)
-router.get('/stats/my-stats', 
-  (req, res, next) => {
-    req.query.user_specific = 'true';
-    next();
-  },
-  taskController.getTaskStats.bind(taskController)
-);
-
-// Obtener tareas vencidas
-// GET /api/tasks/overdue
-// Permisos: Filtrado según acceso del usuario
-router.get('/overdue', 
-  (req, res, next) => {
-    req.query.overdue = 'true';
     next();
   },
   taskController.getAllTasks.bind(taskController)

@@ -50,11 +50,7 @@ class ProjectResponsibleRepository extends BaseRepository {
       usuario_id,
       rol_responsabilidad,
       asignado_por,
-      fecha_fin,
-      activo: true,
-      fecha_asignacion: new Date(),
-      created_at: new Date(),
-      updated_at: new Date()
+      activo: true
     });
   }
 

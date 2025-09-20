@@ -153,7 +153,7 @@ class TaskController {
     } catch (error) {
       console.error('Error creando tarea:', error);
       
-      if (error.message.includes('no encontrado')) {
+      if (error.message.includes('no encontrado') || error.message.includes('no existe')) {
         return res.status(404).json({
           success: false,
           message: error.message
@@ -205,6 +205,15 @@ class TaskController {
 
     } catch (error) {
       console.error('Error obteniendo tarea:', error);
+      
+      // Manejar errores específicos
+      if (error.message && error.message.includes('no encontrada')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -338,6 +347,15 @@ class TaskController {
 
     } catch (error) {
       console.error('Error actualizando tarea:', error);
+      
+      // Manejar errores específicos
+      if (error.message && error.message.includes('no encontrada')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -391,6 +409,22 @@ class TaskController {
 
     } catch (error) {
       console.error('Error eliminando tarea:', error);
+      
+      // Manejar errores específicos
+      if (error.message.includes('en progreso')) {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      if (error.message.includes('no encontrada')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -429,7 +463,7 @@ class TaskController {
         });
       }
 
-      const updatedTask = await this.taskService.updateTask(taskId, { estado });
+      const updatedTask = await this.taskService.updateTask(taskId, { estado }, userId, isAdmin);
 
       if (!updatedTask) {
         return res.status(404).json({
@@ -461,11 +495,12 @@ class TaskController {
   async assignTask(req, res) {
     try {
       const taskId = parseInt(req.params.id);
-      const { usuario_asignado_id } = req.body;
-      const userId = req.user.id;
+      const { userId, usuario_asignado_id } = req.body;
+      const assignedUserId = userId || usuario_asignado_id;
+      const currentUserId = req.user.id;
       const isAdmin = req.user.es_administrador;
 
-      if (!usuario_asignado_id) {
+      if (!assignedUserId) {
         return res.status(400).json({
           success: false,
           message: 'El ID del usuario es requerido'
@@ -482,7 +517,7 @@ class TaskController {
           });
         }
 
-        const canManageProject = await this.taskService.userCanManageProject(userId, task.proyecto_id);
+        const canManageProject = await this.taskService.userCanManageProject(currentUserId, task.proyecto_id);
         if (!canManageProject) {
           return res.status(403).json({
             success: false,
@@ -492,8 +527,8 @@ class TaskController {
       }
 
       const updatedTask = await this.taskService.updateTask(taskId, { 
-        usuario_asignado_id: parseInt(usuario_asignado_id) 
-      });
+        usuario_asignado_id: parseInt(assignedUserId) 
+      }, currentUserId, isAdmin);
 
       if (!updatedTask) {
         return res.status(404).json({
@@ -510,6 +545,15 @@ class TaskController {
 
     } catch (error) {
       console.error('Error asignando tarea:', error);
+      
+      // Manejar errores específicos
+      if (error.message.includes('no existe')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -539,7 +583,16 @@ class TaskController {
         }
       }
 
-      const files = await this.taskService.getTaskFiles(taskId);
+      // Obtener parámetros de paginación de la query
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+
+      const files = await this.taskService.getTaskFiles(taskId, {
+        page,
+        limit,
+        userId,
+        isAdmin
+      });
 
       res.json({
         success: true,

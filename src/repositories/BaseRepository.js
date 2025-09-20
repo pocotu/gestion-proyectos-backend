@@ -393,6 +393,15 @@ class BaseRepository {
       throw error;
     }
   }
+
+  /**
+   * Método db para compatibilidad con query builder estilo Knex
+   * Permite usar this.db('tabla') en lugar de crear nuevas instancias
+   */
+  db(tableName) {
+    const instance = new BaseRepository(tableName);
+    return instance;
+  }
 }
 
 module.exports = BaseRepository;

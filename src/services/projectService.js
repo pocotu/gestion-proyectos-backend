@@ -224,7 +224,8 @@ class ProjectService {
         throw new Error('El usuario ya es responsable de este proyecto');
       }
 
-      await this.projectResponsibleRepository.assignResponsible(projectId, userId, assignedBy);
+      // Llamar con los parámetros correctos: proyecto_id, usuario_id, rol_responsabilidad, asignado_por
+      await this.projectResponsibleRepository.assignResponsible(projectId, userId, 'responsable_principal', assignedBy);
       return { message: 'Responsable asignado correctamente' };
     } catch (error) {
       console.error('Error en ProjectService.assignResponsible:', error);

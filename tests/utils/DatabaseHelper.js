@@ -147,9 +147,17 @@ class DatabaseHelper {
       );
 
       const projectId = result.insertId;
+      
+      // Asignar al creador como responsable principal del proyecto
+      await this.connection.execute(
+        `INSERT INTO proyecto_responsables (proyecto_id, usuario_id, rol_responsabilidad, asignado_por, activo) 
+         VALUES (?, ?, 'responsable_principal', ?, true)`,
+        [projectId, project.creado_por, project.creado_por]
+      );
+      
       const createdProject = { ...project, id: projectId };
       
-      this.logger.success('Proyecto de prueba creado', { id: projectId, titulo: project.titulo });
+      this.logger.success('Proyecto de prueba creado con responsable asignado', { id: projectId, titulo: project.titulo, responsable: project.creado_por });
       return createdProject;
     } catch (error) {
       this.logger.error('Error creando proyecto de prueba', error);
@@ -162,19 +170,27 @@ class DatabaseHelper {
    */
   async createTestTask(taskData = {}) {
     try {
+      // Crear usuario de prueba si no se proporciona creado_por
+      let createdBy = taskData.creado_por;
+      if (!createdBy) {
+        const authHelper = require('./AuthHelper');
+        const testUser = await new authHelper(null, this).createTestUser();
+        createdBy = testUser.id;
+      }
+
       const defaultTask = {
         titulo: 'Tarea Test',
         descripcion: 'Tarea para pruebas',
         proyecto_id: 1,
         usuario_asignado_id: 1,
-        creado_por: 1,
+        creado_por: createdBy,
         estado: 'pendiente',
         prioridad: 'media',
         fecha_inicio: new Date(),
         fecha_fin: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 días después
       };
 
-      const task = { ...defaultTask, ...taskData };
+      const task = { ...defaultTask, ...taskData, creado_por: createdBy };
       
       const [result] = await this.connection.execute(
         `INSERT INTO tareas (titulo, descripcion, proyecto_id, usuario_asignado_id, creado_por, estado, prioridad, fecha_inicio, fecha_fin) 

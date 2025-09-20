@@ -11,6 +11,9 @@ const AuthHelper = require('../utils/AuthHelper');
 const TestLogger = require('../utils/TestLogger');
 const { getTestConfig } = require('../utils/TestConfig');
 
+// Endpoints
+const tasksEndpoint = '/api/tasks';
+
 describe('Tasks Integration Tests', () => {
   let db;
   let authHelper;
@@ -85,7 +88,7 @@ describe('Tasks Integration Tests', () => {
       await createTestTask({
         ...getTestTaskData(),
         proyecto_id: project.id,
-        usuario_asignado_id: testUser.id
+        usuario_asignado_id: user.id
       });
 
       const response = await request(app)
@@ -118,10 +121,10 @@ describe('Tasks Integration Tests', () => {
         .expect(200);
 
       expect(response.body.data.pagination).toMatchObject({
-        currentPage: expect.any(Number),
-        totalPages: expect.any(Number),
-        totalItems: expect.any(Number),
-        itemsPerPage: expect.any(Number)
+        page: expect.any(Number),
+        pages: expect.any(Number),
+        total: expect.any(Number),
+        limit: expect.any(Number)
       });
       
       logger.success('Paginación funcionando correctamente');
@@ -550,7 +553,7 @@ describe('Tasks Integration Tests', () => {
 
       expect(response.body).toMatchObject({
         success: true,
-        message: expect.stringContaining('estado'),
+        message: 'Estado de la tarea actualizado exitosamente',
         data: {
           task: {
             estado: 'en_progreso'
@@ -586,7 +589,7 @@ describe('Tasks Integration Tests', () => {
       logger.info('Test: Asignar tarea a usuario');
       
       const { headers: adminHeaders, user: adminUser } = await authHelper.createAdminAndGetToken();
-      const { user: testUser } = await authHelper.createTestUser();
+      const testUser = await authHelper.createTestUser();
       const project = await createTestProject(adminUser.id);
       const tasks = await createTestTasks(1, project.id, adminUser.id);
       const response = await request(app)
@@ -822,33 +825,49 @@ describe('Tasks Integration Tests', () => {
       createdBy = user.id;
     }
 
-    const now = new Date();
-    const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 días después
+    // Verificar que el usuario existe antes de crear el proyecto
+    const userExists = await db.query('SELECT id FROM usuarios WHERE id = ?', [createdBy]);
+    if (!userExists || userExists.length === 0) {
+      throw new Error(`Usuario con ID ${createdBy} no existe`);
+    }
 
-    const query = `
-      INSERT INTO proyectos (titulo, descripcion, fecha_inicio, fecha_fin, creado_por, estado)
-      VALUES ('Proyecto Test', 'Descripción proyecto test', ?, ?, ?, 'planificacion')
-    `;
-    
-    const result = await db.query(query, [
-      now.toISOString().split('T')[0],
-      futureDate.toISOString().split('T')[0],
-      createdBy
-    ]);
-
-    return {
-      id: result.insertId,
-      titulo: 'Proyecto Test',
-      descripcion: 'Descripción proyecto test',
-      creado_por: createdBy,
-      estado: 'planificacion'
+    // Usar el DatabaseHelper para crear el proyecto
+    const projectData = {
+      titulo: 'Proyecto Test Tasks',
+      descripcion: 'Proyecto para pruebas de tareas',
+      creado_por: createdBy
     };
+
+    const project = await db.createTestProject(projectData);
+    
+    // Verificar que el proyecto se creó correctamente
+    console.log('🧪 [TEST] Proyecto creado:', { id: project.id, titulo: project.titulo });
+    
+    return project;
   }
 
   async function createTestTask(taskData) {
+    // Asegurar que tenemos un usuario válido para creado_por
+    let createdBy = taskData.creado_por;
+    if (!createdBy) {
+      // Crear un usuario de prueba si no se proporciona
+      const testUser = await authHelper.createTestUser();
+      createdBy = testUser.id;
+    }
+
+    // Verificar que el usuario existe antes de crear la tarea
+    const [userExists] = await db.connection.execute(
+      'SELECT id FROM usuarios WHERE id = ?',
+      [createdBy]
+    );
+
+    if (userExists.length === 0) {
+      throw new Error(`Usuario con ID ${createdBy} no existe`);
+    }
+
     const query = `
       INSERT INTO tareas (titulo, descripcion, fecha_inicio, fecha_fin, prioridad, proyecto_id, usuario_asignado_id, estado, creado_por)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const result = await db.query(query, [
@@ -859,24 +878,34 @@ describe('Tasks Integration Tests', () => {
       taskData.prioridad || 'media',
       taskData.proyecto_id,
       taskData.usuario_asignado_id || null,
-      taskData.creado_por || 1
+      taskData.estado || 'pendiente',
+      createdBy
     ]);
 
     return {
       id: result.insertId,
       ...taskData,
-      estado: 'pendiente'
+      creado_por: createdBy,
+      estado: taskData.estado || 'pendiente'
     };
   }
 
-  async function createTestTasks(count, projectId, createdBy = 1) {
+  async function createTestTasks(count, projectId, createdBy = null) {
     const tasks = [];
+    
+    // Si no se proporciona createdBy, crear un usuario de prueba
+    let validCreatedBy = createdBy;
+    if (!validCreatedBy) {
+      const testUser = await authHelper.createTestUser();
+      validCreatedBy = testUser.id;
+    }
+    
     for (let i = 0; i < count; i++) {
       const taskData = {
         ...getTestTaskData(),
         titulo: `Tarea Test ${i + 1}`,
         proyecto_id: projectId,
-        creado_por: createdBy
+        creado_por: validCreatedBy
       };
       const task = await createTestTask(taskData);
       tasks.push(task);

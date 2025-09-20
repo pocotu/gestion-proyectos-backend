@@ -690,6 +690,23 @@ class TaskRepository extends BaseRepository {
   }
 
   /**
+   * Verificar si un usuario existe
+   */
+  async userExists(usuario_id) {
+    try {
+      console.log('Verificando existencia del usuario:', usuario_id);
+      const result = await this.raw('SELECT 1 FROM usuarios WHERE id = ? LIMIT 1', [usuario_id]);
+      console.log('Resultado de la consulta:', result);
+      const exists = result.length > 0;
+      console.log('Usuario existe:', exists);
+      return exists;
+    } catch (error) {
+      console.error('Error verificando existencia del usuario:', error);
+      return false;
+    }
+  }
+
+  /**
    * Verifica si un usuario tiene acceso a una tarea específica
    * Un usuario tiene acceso si:
    * - Es el usuario asignado a la tarea

@@ -65,7 +65,7 @@ const config = {
   SETUP_DB: toBool(process.env.SETUP_DB, false),
 
   // Security
-  BCRYPT_SALT_ROUNDS: toInt(process.env.BCRYPT_SALT_ROUNDS, 12),
+  BCRYPT_SALT_ROUNDS: process.env.NODE_ENV === 'test' ? 4 : toInt(process.env.BCRYPT_SALT_ROUNDS, 12),
   REFRESH_TOKEN_EXPIRY_DAYS: toInt(process.env.REFRESH_TOKEN_EXPIRY_DAYS, 30),
   JWT_BLACKLIST_FALLBACK_HOURS: toInt(process.env.JWT_BLACKLIST_FALLBACK_HOURS, 24),
 // Pagination
