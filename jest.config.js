@@ -17,8 +17,8 @@ module.exports = {
     '<rootDir>/build/'
   ],
   
-  // Timeout para tests
-  testTimeout: 60000,
+  // Timeout para tests - aumentado para evitar ETIMEDOUT
+  testTimeout: 30000,
   
   // Extensiones de módulos
   moduleFileExtensions: ['js', 'json'],
@@ -30,10 +30,10 @@ module.exports = {
   maxWorkers: 1,
   
   // Verbose para debugging
-  verbose: false,
+  verbose: true,
   
-  // Configuración de debugging
-  detectOpenHandles: false,
+  // Configuración de debugging - mejorada para evitar timeouts
+  detectOpenHandles: true,
   forceExit: true,
   
   // Configuración de coverage
@@ -48,7 +48,9 @@ module.exports = {
   // Configuración de módulos
   moduleDirectories: ['node_modules', '<rootDir>/src', '<rootDir>/tests'],
   
-  // Configuración adicional para estabilidad
+  // Configuración de silent para reducir output
   silent: false,
-  runInBand: true
+  
+  // Configuración adicional para evitar problemas de timeout
+  slowTestThreshold: 10
 };

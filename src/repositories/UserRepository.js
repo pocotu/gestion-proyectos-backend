@@ -231,29 +231,55 @@ class UserRepository extends BaseRepository {
    * Actualiza un usuario por ID
    */
   async updateById(id, userData) {
-    const updateData = { ...userData };
+    try {
+      const updateData = { ...userData };
 
-    // Si se actualiza la contraseña, encriptarla
-    if (updateData.contraseña) {
-      updateData.contraseña = await bcrypt.hash(updateData.contraseña, 10);
+      // Si se actualiza la contraseña, encriptarla
+      if (updateData.contraseña) {
+        updateData.contraseña = await bcrypt.hash(updateData.contraseña, 10);
+      }
+
+      // Agregar timestamp de actualización
+      updateData.updated_at = new Date();
+
+      // Usar el query builder del BaseRepository correctamente
+      this.reset(); // Resetear el query builder
+      const result = await this.where('id', id).update(updateData);
+      
+      if (result === 0) {
+        throw new Error('Usuario no encontrado');
+      }
+      
+      // Retornar el usuario actualizado
+      return await this.findById(id);
+    } catch (error) {
+      console.error('Error en UserRepository.updateById:', error);
+      throw error;
     }
-
-    // Agregar timestamp de actualización
-    updateData.updated_at = new Date();
-
-    return await this.where('id', id).update(updateData);
   }
 
   /**
    * Cambia el estado de un usuario
    */
   async changeStatus(id, estado) {
-    if (!['activo', 'inactivo'].includes(estado)) {
-      throw new Error('Estado inválido. Debe ser "activo" o "inactivo"');
+    // Convertir string a boolean para compatibilidad con la base de datos
+    let estadoBoolean;
+    if (typeof estado === 'string') {
+      if (estado === 'activo') {
+        estadoBoolean = true;
+      } else if (estado === 'inactivo') {
+        estadoBoolean = false;
+      } else {
+        throw new Error('Estado inválido. Debe ser "activo" o "inactivo"');
+      }
+    } else if (typeof estado === 'boolean') {
+      estadoBoolean = estado;
+    } else {
+      throw new Error('Estado inválido. Debe ser "activo", "inactivo", true o false');
     }
 
     return await this.where('id', id).update({
-      estado,
+      estado: estadoBoolean,
       updated_at: new Date()
     });
   }
@@ -262,14 +288,14 @@ class UserRepository extends BaseRepository {
    * Activa un usuario
    */
   async activate(id) {
-    return await this.changeStatus(id, 'activo');
+    return await this.changeStatus(id, true);
   }
 
   /**
    * Desactiva un usuario
    */
   async deactivate(id) {
-    return await this.changeStatus(id, 'inactivo');
+    return await this.changeStatus(id, false);
   }
 
   /**

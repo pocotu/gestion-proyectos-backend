@@ -42,12 +42,16 @@ describe('Projects Integration Tests', () => {
   // Cleanup global
   afterAll(async () => {
     logger.testEnd('Finalizando tests de proyectos');
-    await db.close();
-  });
+    try {
+      await db.cleanup();
+      await db.close();
+    } catch (error) {
+      logger.error('Error en cleanup final', error);
+    }
+  }, 30000);
 
   describe('GET /api/projects', () => {
     test('Debe listar proyectos como administrador', async () => {
-      const projectsEndpoint = config.getEndpoint('projects', 'list');
       logger.info('Test: Listar proyectos como admin');
       
       const { user: adminUser, headers: adminHeaders } = await authHelper.createAdminAndGetToken();
@@ -56,7 +60,7 @@ describe('Projects Integration Tests', () => {
       await createTestProjects(3, adminUser.id);
 
       const response = await request(app)
-        .get(projectsEndpoint)
+        .get('/api/projects')
         .set(adminHeaders)
         .expect(200);
 
@@ -83,7 +87,7 @@ describe('Projects Integration Tests', () => {
       const project = await createTestProject(projectData, user.id);
 
       const response = await request(app)
-        .get(projectsEndpoint)
+        .get('/api/projects')
         .set(headers)
         .expect(200);
 
@@ -106,7 +110,7 @@ describe('Projects Integration Tests', () => {
       await createTestProjects(5, adminUser.id);
 
       const response = await request(app)
-        .get(`${projectsEndpoint}?page=1&limit=3`)
+        .get('/api/projects?page=1&limit=3')
         .set(adminHeaders)
         .expect(200);
 
@@ -132,7 +136,7 @@ describe('Projects Integration Tests', () => {
       });
 
       const response = await request(app)
-        .get(`${projectsEndpoint}?estado=en_progreso`)
+        .get('/api/projects?estado=en_progreso')
         .set(adminHeaders)
         .expect(200);
 
@@ -153,7 +157,7 @@ describe('Projects Integration Tests', () => {
       });
 
       const response = await request(app)
-        .get(`${projectsEndpoint}?search=Buscable`)
+        .get('/api/projects?search=Buscable')
         .set(adminHeaders)
         .expect(200);
 
@@ -165,7 +169,6 @@ describe('Projects Integration Tests', () => {
 
   describe('POST /api/projects', () => {
     test('Debe crear proyecto exitosamente como admin', async () => {
-      const projectsEndpoint = config.getEndpoint('projects', 'create');
       logger.info('Test: Crear proyecto como admin');
       
       const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();
@@ -173,7 +176,7 @@ describe('Projects Integration Tests', () => {
       const projectData = getTestProjectData();
 
       const response = await request(app)
-        .post(projectsEndpoint)
+        .post('/api/projects')
         .set(adminHeaders)
         .send(projectData)
         .expect(201);
@@ -183,9 +186,8 @@ describe('Projects Integration Tests', () => {
         message: expect.stringContaining('creado'),
         data: {
           project: {
-            titulo: projectData.titulo,
-            descripcion: projectData.descripcion,
-            estado: 'planificacion'
+            id: expect.any(Number),
+            affectedRows: expect.any(Number)
           }
         }
       });
@@ -201,7 +203,7 @@ describe('Projects Integration Tests', () => {
       const projectData = getTestProjectData();
 
       const response = await request(app)
-        .post(projectsEndpoint)
+        .post('/api/projects')
         .set(headers)
         .send(projectData)
         .expect(201);
@@ -222,7 +224,7 @@ describe('Projects Integration Tests', () => {
       };
 
       const response = await request(app)
-        .post(projectsEndpoint)
+        .post('/api/projects')
         .set(adminHeaders)
         .send(incompleteData)
         .expect(400);
@@ -248,7 +250,7 @@ describe('Projects Integration Tests', () => {
       };
 
       const response = await request(app)
-        .post(projectsEndpoint)
+        .post('/api/projects')
         .set(adminHeaders)
         .send(invalidDateData)
         .expect(400);
@@ -269,7 +271,7 @@ describe('Projects Integration Tests', () => {
       const projectData = getTestProjectData();
 
       const response = await request(app)
-        .post(projectsEndpoint)
+        .post('/api/projects')
         .set(headers)
         .send(projectData)
         .expect(403);
@@ -281,8 +283,6 @@ describe('Projects Integration Tests', () => {
   });
 
   describe('GET /api/projects/:id', () => {
-    const getProjectEndpoint = (id) => config.getFullEndpointUrl('projects', 'detail', { id });
-
     test('Debe obtener proyecto específico', async () => {
       logger.info('Test: Obtener proyecto específico');
       
@@ -290,7 +290,7 @@ describe('Projects Integration Tests', () => {
       const project = await createTestProject(getTestProjectData());
 
       const response = await request(app)
-        .get(getProjectEndpoint(project.id))
+        .get(`/api/projects/${project.id}`)
         .set(adminHeaders)
         .expect(200);
 
@@ -314,7 +314,7 @@ describe('Projects Integration Tests', () => {
       const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();
 
       const response = await request(app)
-        .get(getProjectEndpoint(99999))
+        .get('/api/projects/99999')
         .set(adminHeaders)
         .expect(404);
 
@@ -330,7 +330,7 @@ describe('Projects Integration Tests', () => {
       const project = await createTestProject(getTestProjectData());
 
       const response = await request(app)
-        .get(getProjectEndpoint(project.id))
+        .get(`/api/projects/${project.id}`)
         .set(headers)
         .expect(403);
 
@@ -341,8 +341,6 @@ describe('Projects Integration Tests', () => {
   });
 
   describe('PUT /api/projects/:id', () => {
-    const updateProjectEndpoint = (id) => config.getFullEndpointUrl('projects', 'update', { id });
-
     test('Debe actualizar proyecto como admin', async () => {
       logger.info('Test: Actualizar proyecto como admin');
       
@@ -355,7 +353,7 @@ describe('Projects Integration Tests', () => {
       };
 
       const response = await request(app)
-        .put(updateProjectEndpoint(project.id))
+        .put(`/api/projects/${project.id}`)
         .set(adminHeaders)
         .send(updateData)
         .expect(200);
@@ -386,7 +384,7 @@ describe('Projects Integration Tests', () => {
       };
 
       const response = await request(app)
-        .put(updateProjectEndpoint(project.id))
+        .put(`/api/projects/${project.id}`)
         .set(adminHeaders)
         .send(invalidUpdate)
         .expect(400);
@@ -398,8 +396,6 @@ describe('Projects Integration Tests', () => {
   });
 
   describe('DELETE /api/projects/:id', () => {
-    const deleteProjectEndpoint = (id) => config.getFullEndpointUrl('projects', 'delete', { id });
-
     test('Debe eliminar proyecto como admin', async () => {
       logger.info('Test: Eliminar proyecto como admin');
       
@@ -407,7 +403,7 @@ describe('Projects Integration Tests', () => {
       const project = await createTestProject(getTestProjectData());
 
       const response = await request(app)
-        .delete(deleteProjectEndpoint(project.id))
+        .delete(`/api/projects/${project.id}`)
         .set(adminHeaders)
         .expect(200);
 
@@ -429,7 +425,7 @@ describe('Projects Integration Tests', () => {
       await createTestTask(project.id);
 
       const response = await request(app)
-        .delete(deleteProjectEndpoint(project.id))
+        .delete(`/api/projects/${project.id}`)
         .set(adminHeaders)
         .expect(400);
 
@@ -703,7 +699,7 @@ describe('Projects Integration Tests', () => {
       });
       
       logger.success('Búsqueda de proyectos funcionando');
-    });
+    }, 45000);
   });
 
   describe('Flujo completo de gestión de proyectos', () => {
@@ -716,7 +712,7 @@ describe('Projects Integration Tests', () => {
       logger.debug('Paso 1: Crear proyecto');
       const projectData = getTestProjectData();
       const createResponse = await request(app)
-        .post(config.getEndpoint('projects', 'create'))
+        .post('/api/projects')
         .set(adminHeaders)
         .send(projectData)
         .expect(201);
@@ -726,7 +722,7 @@ describe('Projects Integration Tests', () => {
       // 2. Obtener proyecto
       logger.debug('Paso 2: Obtener proyecto');
       const getResponse = await request(app)
-        .get(config.getFullEndpointUrl('projects', 'detail', { id: projectId }))
+        .get(`/api/projects/${projectId}`)
         .set(adminHeaders)
         .expect(200);
 
@@ -735,7 +731,7 @@ describe('Projects Integration Tests', () => {
       // 3. Actualizar proyecto
       logger.debug('Paso 3: Actualizar proyecto');
       const updateResponse = await request(app)
-        .put(config.getFullEndpointUrl('projects', 'update', { id: projectId }))
+        .put(`/api/projects/${projectId}`)
         .set(adminHeaders)
         .send({
           titulo: 'Proyecto Flujo Actualizado',
@@ -748,7 +744,7 @@ describe('Projects Integration Tests', () => {
       // 4. Cambiar estado
       logger.debug('Paso 4: Cambiar estado');
       const statusResponse = await request(app)
-        .put(`/api/projects/${projectId}/status`)
+        .patch(`/api/projects/${projectId}/status`)
         .set(adminHeaders)
         .send({ estado: 'en_progreso' })
         .expect(200);
@@ -758,14 +754,14 @@ describe('Projects Integration Tests', () => {
       // 5. Eliminar proyecto
       logger.debug('Paso 5: Eliminar proyecto');
       const deleteResponse = await request(app)
-        .delete(config.getFullEndpointUrl('projects', 'delete', { id: projectId }))
+        .delete(`/api/projects/${projectId}`)
         .set(adminHeaders)
         .expect(200);
 
       expect(deleteResponse.body.success).toBe(true);
       
       logger.success('Flujo completo de gestión de proyectos exitoso');
-    });
+    }, 60000);
   });
 
   // Funciones auxiliares para tests

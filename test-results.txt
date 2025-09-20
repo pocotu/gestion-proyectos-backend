@@ -1,0 +1,6 @@
+Iniciando debug de Jest...
+Ejecutando Jest...
+Error ejecutando Jest:
+Status: null
+Signal: SIGTERM
+Error guardado en jest-error.txt

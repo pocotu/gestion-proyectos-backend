@@ -763,7 +763,7 @@ class ProjectController {
       const userId = req.user.id;
       const isAdmin = req.user.es_administrador || false;
       
-      const result = await this.projectService.search(searchQuery, {
+      const result = await this.projectService.searchProjects(searchQuery, {
         page: parseInt(page),
         limit: parseInt(limit),
         userId,

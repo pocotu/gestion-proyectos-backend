@@ -269,7 +269,11 @@ class TestConfig {
       url = url.replace(`:${key}`, params[key]);
     });
 
-    return `${this.config.server.baseUrl}${url}`;
+    // Asegurar que la baseUrl termine con / y la url no empiece con /
+    const baseUrl = this.config.server.baseUrl.replace(/\/$/, '');
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+
+    return `${baseUrl}${cleanUrl}`;
   }
 
   /**

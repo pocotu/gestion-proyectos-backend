@@ -40,10 +40,10 @@ class UserService {
       return {
         users: users.map(user => this.sanitizeUser(user)),
         pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
+          currentPage: page,
+          totalPages: Math.ceil(total / limit),
+          totalItems: total,
+          itemsPerPage: limit
         }
       };
     } catch (error) {
@@ -225,10 +225,10 @@ class UserService {
       return {
         users: users.map(user => this.sanitizeUser(user)),
         pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
+          currentPage: page,
+          totalPages: Math.ceil(total / limit),
+          totalItems: total,
+          itemsPerPage: limit
         }
       };
     } catch (error) {
@@ -322,6 +322,21 @@ class UserService {
     if (!user) return null;
     
     const { contraseña, ...sanitizedUser } = user;
+    
+    // Convertir campos numéricos a booleanos
+    if (sanitizedUser.es_administrador !== undefined) {
+      sanitizedUser.es_administrador = Boolean(sanitizedUser.es_administrador);
+    }
+    
+    if (sanitizedUser.estado !== undefined) {
+      // Convertir estado a string legible para el frontend
+      if (typeof sanitizedUser.estado === 'boolean') {
+        sanitizedUser.estado = sanitizedUser.estado ? 'activo' : 'inactivo';
+      } else if (typeof sanitizedUser.estado === 'number') {
+        sanitizedUser.estado = sanitizedUser.estado ? 'activo' : 'inactivo';
+      }
+    }
+    
     return sanitizedUser;
   }
 

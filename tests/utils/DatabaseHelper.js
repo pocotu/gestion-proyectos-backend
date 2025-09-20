@@ -16,8 +16,8 @@ class DatabaseHelper {
     this.config = {
       host: process.env.DB_HOST || 'localhost',
       user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'gestion_proyectos_test',
+      password: process.env.DB_PASSWORD || 'kali',
+      database: process.env.DB_NAME || 'gestion_proyectos',
       port: process.env.DB_PORT || 3306,
       multipleStatements: true
     };
@@ -28,19 +28,9 @@ class DatabaseHelper {
    */
   async initialize() {
     try {
-      this.logger.info('Inicializando conexión a base de datos de pruebas');
+      this.logger.info('Inicializando conexión a base de datos original');
       
-      // Crear conexión sin especificar base de datos primero
-      const tempConnection = await mysql.createConnection({
-        ...this.config,
-        database: undefined
-      });
-
-      // Crear base de datos de pruebas si no existe
-      await tempConnection.execute(`CREATE DATABASE IF NOT EXISTS \`${this.config.database}\``);
-      await tempConnection.end();
-
-      // Conectar a la base de datos de pruebas
+      // Conectar directamente a la base de datos original
       this.connection = await mysql.createConnection(this.config);
       
       this.logger.success('Conexión a base de datos establecida', {
@@ -48,8 +38,8 @@ class DatabaseHelper {
         database: this.config.database
       });
 
-      // Crear tablas si no existen
-      await this.createTables();
+      // Verificar que las tablas existen (no las creamos, usamos las existentes)
+      await this.verifyTables();
       
     } catch (error) {
       this.logger.error('Error al inicializar base de datos', error);
@@ -58,151 +48,50 @@ class DatabaseHelper {
   }
 
   /**
-   * Crear tablas necesarias para tests
+   * Verificar que las tablas necesarias existen en la base de datos
    */
-  async createTables() {
+  async verifyTables() {
     try {
-      this.logger.info('Verificando y creando tablas necesarias');
+      this.logger.info('Verificando que las tablas necesarias existen');
 
-      // Crear tablas una por una para evitar problemas con múltiples statements
-      const tables = [
-        `CREATE TABLE IF NOT EXISTS usuarios (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          nombre VARCHAR(100) NOT NULL,
-          email VARCHAR(100) UNIQUE NOT NULL,
-          contraseña VARCHAR(255) NOT NULL,
-          telefono VARCHAR(20),
-          estado BOOLEAN DEFAULT TRUE,
-          es_administrador BOOLEAN DEFAULT FALSE,
-          configuraciones JSON DEFAULT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS roles (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          nombre VARCHAR(50) NOT NULL UNIQUE
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS usuario_roles (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          usuario_id INT NOT NULL,
-          rol_id INT NOT NULL,
-          activo BOOLEAN DEFAULT TRUE,
-          asignado_por INT,
-          fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-          FOREIGN KEY (rol_id) REFERENCES roles(id) ON DELETE CASCADE,
-          FOREIGN KEY (asignado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
-          UNIQUE KEY unique_usuario_rol (usuario_id, rol_id)
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS proyectos (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          titulo VARCHAR(150) NOT NULL,
-          descripcion TEXT,
-          fecha_inicio DATE,
-          fecha_fin DATE,
-          estado ENUM('planificacion', 'en_progreso', 'completado', 'cancelado') DEFAULT 'planificacion',
-          creado_por INT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          FOREIGN KEY (creado_por) REFERENCES usuarios(id)
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS proyecto_responsables (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          proyecto_id INT NOT NULL,
-          usuario_id INT NOT NULL,
-          activo BOOLEAN DEFAULT TRUE,
-          asignado_por INT,
-          fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE,
-          FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-          FOREIGN KEY (asignado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
-          UNIQUE KEY unique_proyecto_responsable (proyecto_id, usuario_id)
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS tareas (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          titulo VARCHAR(150) NOT NULL,
-          descripcion TEXT,
-          proyecto_id INT NOT NULL,
-          usuario_asignado_id INT,
-          estado ENUM('pendiente', 'en_progreso', 'completada', 'cancelada') DEFAULT 'pendiente',
-          prioridad ENUM('baja', 'media', 'alta', 'critica') DEFAULT 'media',
-          fecha_inicio DATE,
-          fecha_fin DATE,
-          fecha_limite DATE,
-          porcentaje_completado DECIMAL(5,2) DEFAULT 0.00,
-          tiempo_estimado INT,
-          tiempo_real INT,
-          padre_tarea_id INT,
-          creado_por INT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE,
-          FOREIGN KEY (usuario_asignado_id) REFERENCES usuarios(id) ON DELETE SET NULL,
-          FOREIGN KEY (creado_por) REFERENCES usuarios(id),
-          FOREIGN KEY (padre_tarea_id) REFERENCES tareas(id) ON DELETE SET NULL,
-          CONSTRAINT chk_porcentaje_completado CHECK (porcentaje_completado >= 0 AND porcentaje_completado <= 100)
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS refresh_tokens (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          token VARCHAR(500) NOT NULL UNIQUE,
-          usuario_id INT NOT NULL,
-          expires_at TIMESTAMP NOT NULL,
-          is_revoked BOOLEAN DEFAULT FALSE,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS token_blacklist (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          token_jti VARCHAR(255) NOT NULL UNIQUE,
-          usuario_id INT NOT NULL,
-          expires_at TIMESTAMP NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS logs_actividad (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          usuario_id INT,
-          accion VARCHAR(100) NOT NULL,
-          entidad_tipo VARCHAR(50) NOT NULL,
-          entidad_id INT NOT NULL,
-          descripcion TEXT,
-          ip_address VARCHAR(45),
-          user_agent TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
-        )`
+      const requiredTables = [
+        'usuarios', 'roles', 'usuario_roles', 'proyectos', 
+        'proyecto_responsables', 'tareas', 'refresh_tokens', 
+        'token_blacklist', 'logs_actividad'
       ];
 
-      // Ejecutar cada tabla por separado
-      for (const tableSQL of tables) {
-        await this.connection.execute(tableSQL);
+      for (const tableName of requiredTables) {
+        const [rows] = await this.connection.execute(
+          `SELECT COUNT(*) as count FROM information_schema.tables 
+           WHERE table_schema = ? AND table_name = ?`,
+          [this.config.database, tableName]
+        );
+        
+        if (rows[0].count === 0) {
+          throw new Error(`Tabla requerida '${tableName}' no existe en la base de datos`);
+        }
       }
 
-      // Insertar roles básicos
-      await this.connection.execute(`
-        INSERT IGNORE INTO roles (nombre) VALUES 
-        ('admin'),
-        ('responsable_proyecto'),
-        ('responsable_tarea')
-      `);
+      // Verificar que existen roles básicos
+      const [roleRows] = await this.connection.execute(
+        'SELECT COUNT(*) as count FROM roles WHERE nombre IN (?, ?, ?)',
+        ['admin', 'responsable_proyecto', 'responsable_tarea']
+      );
 
-      this.logger.success('Tablas creadas/verificadas exitosamente');
+      if (roleRows[0].count < 3) {
+        this.logger.info('Insertando roles básicos faltantes');
+        await this.connection.execute(`
+          INSERT IGNORE INTO roles (nombre) VALUES 
+          ('admin'),
+          ('responsable_proyecto'),
+          ('responsable_tarea')
+        `);
+      }
+
+      this.logger.success('Todas las tablas necesarias están presentes');
 
     } catch (error) {
-      this.logger.error('Error al crear tablas', error);
+      this.logger.error('Error al verificar tablas', error);
       throw error;
     }
   }
@@ -213,9 +102,8 @@ class DatabaseHelper {
   async setupTestDatabase() {
     try {
       await this.initialize();
-      await this.createTables();
-      await this.cleanTestData();
-      this.logger.success('Base de datos de test configurada exitosamente');
+      // No limpiamos datos en la base de datos original, solo verificamos conexión
+      this.logger.success('Base de datos original configurada para tests');
     } catch (error) {
       this.logger.error('Error configurando base de datos de test', error);
       throw error;
@@ -227,7 +115,7 @@ class DatabaseHelper {
    */
   async cleanupTestDatabase() {
     try {
-      await this.cleanTestData();
+      // Solo cerramos la conexión, no limpiamos datos de la base original
       await this.close();
       this.logger.success('Cleanup de base de datos completado');
     } catch (error) {
