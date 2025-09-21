@@ -82,13 +82,13 @@ class TaskRepository extends BaseRepository {
   /**
    * Obtiene todas las tareas con filtros y paginación
    */
-  async findAll({ limit = 10, offset = 0, filters = {}, userId = null, isAdmin = false }) {
-    console.log('TaskRepository.findAll - Iniciando con parámetros:', { limit, offset, filters, userId, isAdmin });
+  async findAll(options = {}) {
+    const { limit = 10, offset = 0, filters = {}, userId, isAdmin } = options;
     
     try {
       // Usar el query builder del BaseRepository
       let query = this.select('*');
-
+  
       // Aplicar filtros básicos
       if (filters.estado) {
         query = query.where('estado', filters.estado);
@@ -101,12 +101,12 @@ class TaskRepository extends BaseRepository {
       if (filters.proyecto_id) {
         query = query.where('proyecto_id', filters.proyecto_id);
       }
-
+  
       // Si no es admin, filtrar por acceso del usuario
       if (!isAdmin && userId) {
         query = query.where('usuario_asignado_id', userId);
       }
-
+  
       query = query.orderBy('created_at', 'DESC');
       
       if (limit) {
@@ -115,10 +115,9 @@ class TaskRepository extends BaseRepository {
           query = query.offset(offset);
         }
       }
-
+  
       const rows = await query.get();
-
-      console.log('TaskRepository.findAll - Encontradas', rows.length, 'tareas');
+      
       return rows;
     } catch (error) {
       console.error('Error en TaskRepository.findAll:', error);
@@ -129,13 +128,13 @@ class TaskRepository extends BaseRepository {
   /**
    * Cuenta el total de tareas con filtros
    */
-  async count(filters = {}, userId = null, isAdmin = false) {
-    console.log('TaskRepository.count - Iniciando con parámetros:', { filters, userId, isAdmin });
+  async count(options = {}) {
+    const { filters = {}, userId, isAdmin } = options;
     
     try {
       // Usar el query builder del BaseRepository para count
       let query = this.select('COUNT(*) as total');
-
+  
       // Aplicar filtros básicos
       if (filters.estado) {
         query = query.where('estado', filters.estado);
@@ -148,16 +147,15 @@ class TaskRepository extends BaseRepository {
       if (filters.proyecto_id) {
         query = query.where('proyecto_id', filters.proyecto_id);
       }
-
+  
       // Si no es admin, filtrar por acceso del usuario
       if (!isAdmin && userId) {
         query = query.where('usuario_asignado_id', userId);
       }
-
+  
       const result = await query.first();
       const total = result?.total || 0;
-
-      console.log('TaskRepository.count - Total encontrado:', total);
+  
       return total;
     } catch (error) {
       console.error('Error en TaskRepository.count:', error);
@@ -668,34 +666,20 @@ class TaskRepository extends BaseRepository {
    * Verificar si un proyecto existe
    */
   async projectExists(proyecto_id) {
-    try {
-      console.log('Verificando existencia del proyecto:', proyecto_id);
-      const result = await this.raw('SELECT 1 FROM proyectos WHERE id = ? LIMIT 1', [proyecto_id]);
-      console.log('Resultado de la consulta:', result);
-      const exists = result.length > 0;
-      console.log('Proyecto existe:', exists);
-      return exists;
-    } catch (error) {
-      console.error('Error verificando existencia del proyecto:', error);
-      return false;
-    }
+    const query = 'SELECT COUNT(*) as count FROM proyectos WHERE id = ?';
+    const result = await this.db.query(query, [proyecto_id]);
+    const exists = result.rows[0].count > 0;
+    return exists;
   }
 
   /**
    * Verificar si un usuario existe
    */
   async userExists(usuario_id) {
-    try {
-      console.log('Verificando existencia del usuario:', usuario_id);
-      const result = await this.raw('SELECT 1 FROM usuarios WHERE id = ? LIMIT 1', [usuario_id]);
-      console.log('Resultado de la consulta:', result);
-      const exists = result.length > 0;
-      console.log('Usuario existe:', exists);
-      return exists;
-    } catch (error) {
-      console.error('Error verificando existencia del usuario:', error);
-      return false;
-    }
+    const query = 'SELECT COUNT(*) as count FROM usuarios WHERE id = ?';
+    const result = await this.db.query(query, [usuario_id]);
+    const exists = result.rows[0].count > 0;
+    return exists;
   }
 
   /**

@@ -275,7 +275,12 @@ class ProjectRepository extends BaseRepository {
     };
 
     console.log('ProjectRepository.create - datos a insertar:', data);
-    return await this.insert(data);
+    try {
+        const result = await this.insert(data);
+        return await this.findById(result.insertId);
+    } catch (error) {
+        throw new Error(`Error creating project: ${error.message}`);
+    }
   }
 
   /**
@@ -407,43 +412,23 @@ class ProjectRepository extends BaseRepository {
   /**
    * Busca proyectos donde un usuario es responsable
    */
-  async findByResponsible(userId, { limit = 10, offset = 0 } = {}) {
-    try {
-      console.log('🔍 [PROJECT-REPO] findByResponsible - userId:', userId, 'limit:', limit, 'offset:', offset);
-      
-      // Convertir a números para evitar problemas con MySQL
-      const numericLimit = parseInt(limit, 10);
-      const numericOffset = parseInt(offset, 10);
-      const numericUserId = parseInt(userId, 10);
-      
-      console.log('🔍 [PROJECT-REPO] findByResponsible - Parámetros convertidos:', {
-        userId: numericUserId,
-        limit: numericLimit,
-        offset: numericOffset
-      });
-      
-      // Usar query sin prepared statements para LIMIT y OFFSET
-      const query = `
-        SELECT DISTINCT p.*, pr.rol_responsabilidad
-        FROM proyectos p
-        INNER JOIN proyecto_responsables pr ON p.id = pr.proyecto_id
-        WHERE pr.usuario_id = ${numericUserId} AND pr.activo = TRUE
-        ORDER BY p.created_at DESC
-        LIMIT ${numericLimit} OFFSET ${numericOffset}
-      `;
-      
-      console.log('🔍 [PROJECT-REPO] findByResponsible - Ejecutando query:', query);
-      
-      const result = await this.raw(query, []);
-      
-      console.log('🔍 [PROJECT-REPO] findByResponsible - Resultado:', result.length, 'proyectos encontrados');
-      
-      return result;
-    } catch (error) {
-      console.error('🔍 [PROJECT-REPO] findByResponsible - Error:', error.message);
-      console.error('🔍 [PROJECT-REPO] findByResponsible - Stack:', error.stack);
-      throw error;
-    }
+  async findByResponsible(userId, limit = 10, offset = 0) {
+      try {
+          const query = `
+              SELECT DISTINCT p.*
+              FROM proyectos p
+              INNER JOIN proyecto_responsables pr ON p.id = pr.proyecto_id
+              WHERE pr.usuario_id = ? AND pr.activo = 1
+              ORDER BY p.created_at DESC
+              LIMIT ? OFFSET ?
+          `;
+          
+          const result = await this.raw(query, [userId, limit, offset]);
+          
+          return result;
+      } catch (error) {
+          throw new Error(`Error finding projects by responsible: ${error.message}`);
+      }
   }
 
   /**

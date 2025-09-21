@@ -84,32 +84,16 @@ class ProjectService {
    */
   async createProject(projectData, createdBy) {
     try {
-      console.log('ProjectService.createProject - projectData:', projectData);
-      console.log('ProjectService.createProject - createdBy:', createdBy);
-      
-      // Verificar si ya existe un proyecto con el mismo título
-      const existingProject = await this.projectRepository.findByTitle(projectData.titulo);
-      if (existingProject) {
-        throw new Error('Ya existe un proyecto con ese título');
-      }
-
       const dataToCreate = {
         ...projectData,
-        creado_por: createdBy,
-        estado: 'planificacion'
+        created_by: createdBy,
+        created_at: new Date(),
+        updated_at: new Date()
       };
-      
-      console.log('ProjectService.createProject - dataToCreate:', dataToCreate);
-
-      const result = await this.projectRepository.create(dataToCreate);
-      
-      // Obtener el proyecto completo recién creado
-      const newProject = await this.projectRepository.findById(result.id);
-      
-      return newProject;
+  
+      return await this.projectRepository.create(dataToCreate);
     } catch (error) {
-      console.error('Error en ProjectService.createProject:', error);
-      throw error;
+      throw new Error(`Error creating project: ${error.message}`);
     }
   }
 
@@ -420,35 +404,25 @@ class ProjectService {
   /**
    * Obtener mis proyectos (donde soy responsable)
    */
-  async getUserProjects(userId, { page = 1, limit = 10 } = {}) {
+  async getUserProjects(userId, page = 1, limit = 10) {
     try {
-      console.log('🔍 [PROJECT-SERVICE] getUserProjects - userId:', userId, 'page:', page, 'limit:', limit);
-      
-      const offset = (page - 1) * limit;
-      
-      const projects = await this.projectRepository.findByResponsible(userId, {
-        limit,
-        offset
-      });
-
-      console.log('🔍 [PROJECT-SERVICE] getUserProjects - projects found:', projects.length);
-
-      const total = await this.projectRepository.countByResponsible(userId);
-
-      console.log('🔍 [PROJECT-SERVICE] getUserProjects - total count:', total);
-
-      return {
-        projects,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
-        }
-      };
+        const offset = (page - 1) * limit;
+        
+        const projects = await this.projectRepository.findByResponsible(userId, limit, offset);
+        
+        const total = await this.projectRepository.countByResponsible(userId);
+        
+        return {
+            projects,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        };
     } catch (error) {
-      console.error('Error en ProjectService.getUserProjects:', error);
-      throw new Error('Error obteniendo mis proyectos');
+        throw new Error(`Error getting user projects: ${error.message}`);
     }
   }
 
