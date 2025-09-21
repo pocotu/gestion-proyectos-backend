@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const config = require('../config/config');
 const { UserModel } = require('../models');
+const UserRoleRepository = require('../repositories/UserRoleRepository');
 
 /**
  * AuthService - Servicio de autenticación simplificado para MVP
@@ -87,6 +88,16 @@ class AuthService {
         throw new Error('Usuario inactivo');
       }
 
+      // Obtener roles del usuario
+      let userRoles = [];
+      try {
+        const roles = await UserRoleRepository.getUserRolesStatic(user.id);
+        userRoles = roles.map(role => role.rol_nombre);
+      } catch (error) {
+        console.warn('Error obteniendo roles del usuario:', error.message);
+        // Continuar sin roles si hay error
+      }
+
       // Generar token
       const token = this.generateJWT(user);
 
@@ -97,7 +108,8 @@ class AuthService {
           nombre: user.nombre,
           email: user.email,
           telefono: user.telefono,
-          es_administrador: user.es_administrador
+          es_administrador: user.es_administrador,
+          roles: userRoles
         },
         token
       };
@@ -139,7 +151,7 @@ class AuthService {
   }
 
   /**
-   * Obtiene información del usuario por ID
+   * Obtiene información del usuario
    * @param {number} userId - ID del usuario
    * @returns {Object} Información del usuario
    */
@@ -150,13 +162,23 @@ class AuthService {
         throw new Error('Usuario no encontrado');
       }
 
+      // Obtener roles del usuario
+      let userRoles = [];
+      try {
+        const roles = await UserRoleRepository.getUserRolesStatic(user.id);
+        userRoles = roles.map(role => role.rol_nombre);
+      } catch (error) {
+        console.warn('Error obteniendo roles del usuario:', error.message);
+        // Continuar sin roles si hay error
+      }
+
       return {
         id: user.id,
         nombre: user.nombre,
         email: user.email,
         telefono: user.telefono,
         es_administrador: user.es_administrador,
-        estado: user.estado
+        roles: userRoles
       };
     } catch (error) {
       console.error('Error obteniendo información del usuario:', error);

@@ -2,6 +2,7 @@ const RoleSeeder = require('./RoleSeeder');
 const UserSeeder = require('./UserSeeder');
 const ProjectSeeder = require('./ProjectSeeder');
 const TaskSeeder = require('./TaskSeeder');
+const ActivityLogSeeder = require('./ActivityLogSeeder');
 
 /**
  * SeederManager - Gestor principal de seeders
@@ -18,7 +19,8 @@ class SeederManager {
       new RoleSeeder(),
       new UserSeeder(),
       new ProjectSeeder(),
-      new TaskSeeder()
+      new TaskSeeder(),
+      new ActivityLogSeeder()
     ];
   }
 

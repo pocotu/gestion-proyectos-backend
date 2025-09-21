@@ -11,7 +11,7 @@ const BaseRepository = require('./BaseRepository');
  */
 class LogActivityRepository extends BaseRepository {
   constructor() {
-    super('log_actividades');
+    super('logs_actividad');
   }
 
   /**
@@ -59,19 +59,24 @@ class LogActivityRepository extends BaseRepository {
   /**
    * Obtiene actividades por usuario con información relacionada
    */
-  async getByUser(usuario_id, limit = 50, offset = 0) {
-    return await this
-      .select(`
-        log_actividades.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'log_actividades.usuario_id', 'usuarios.id')
-      .where('log_actividades.usuario_id', usuario_id)
-      .orderBy('log_actividades.created_at', 'DESC')
-      .limit(limit)
-      .offset(offset)
-      .get();
+  async getByUser(userId, page = 1, limit = 50) {
+    try {
+      const offset = (page - 1) * limit;
+      
+      const results = await this
+        .select('la.*, u.nombre as usuario_nombre, u.email as usuario_email')
+        .from('logs_actividad la')
+        .leftJoin('usuarios u', 'la.usuario_id', 'u.id')
+        .where('la.usuario_id', userId)
+        .orderBy('la.created_at', 'DESC')
+        .limit(limit, offset)
+        .get();
+      
+      return results;
+    } catch (error) {
+      console.error('Error in getByUser:', error);
+      throw error;
+    }
   }
 
   /**
@@ -80,14 +85,14 @@ class LogActivityRepository extends BaseRepository {
   async getByEntity(entidad_tipo, entidad_id, limit = 50, offset = 0) {
     return await this
       .select(`
-        log_actividades.*,
+        logs_actividad.*,
         usuarios.nombre as usuario_nombre,
         usuarios.email as usuario_email
       `)
-      .leftJoin('usuarios', 'log_actividades.usuario_id', 'usuarios.id')
-      .where('log_actividades.entidad_tipo', entidad_tipo)
-      .where('log_actividades.entidad_id', entidad_id)
-      .orderBy('log_actividades.created_at', 'DESC')
+      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
+      .where('logs_actividad.entidad_tipo', entidad_tipo)
+      .where('logs_actividad.entidad_id', entidad_id)
+      .orderBy('logs_actividad.created_at', 'DESC')
       .limit(limit)
       .offset(offset)
       .get();
@@ -99,13 +104,13 @@ class LogActivityRepository extends BaseRepository {
   async getByAction(accion, limit = 50, offset = 0) {
     return await this
       .select(`
-        log_actividades.*,
+        logs_actividad.*,
         usuarios.nombre as usuario_nombre,
         usuarios.email as usuario_email
       `)
-      .leftJoin('usuarios', 'log_actividades.usuario_id', 'usuarios.id')
-      .where('log_actividades.accion', accion)
-      .orderBy('log_actividades.created_at', 'DESC')
+      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
+      .where('logs_actividad.accion', accion)
+      .orderBy('logs_actividad.created_at', 'DESC')
       .limit(limit)
       .offset(offset)
       .get();
@@ -114,74 +119,212 @@ class LogActivityRepository extends BaseRepository {
   /**
    * Obtiene actividades por rango de fechas
    */
-  async getByDateRange(fecha_inicio, fecha_fin, limit = 100, offset = 0) {
+  async getByDateRange(fecha_inicio, fecha_fin, limit = 50, offset = 0) {
     return await this
       .select(`
-        log_actividades.*,
+        logs_actividad.*,
         usuarios.nombre as usuario_nombre,
         usuarios.email as usuario_email
       `)
-      .leftJoin('usuarios', 'log_actividades.usuario_id', 'usuarios.id')
-      .whereBetween('log_actividades.created_at', [fecha_inicio, fecha_fin])
-      .orderBy('log_actividades.created_at', 'DESC')
+      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
+      .whereBetween('logs_actividad.created_at', [fecha_inicio, fecha_fin])
+      .orderBy('logs_actividad.created_at', 'DESC')
       .limit(limit)
       .offset(offset)
       .get();
   }
 
   /**
-   * Obtiene resumen de actividades
+   * Obtiene actividades recientes del sistema
    */
-  async getActivitySummary(usuario_id = null, dias = 30) {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - dias);
+  async getRecentActivities(limit = 20) {
+    return await this
+      .select(`
+        logs_actividad.*,
+        usuarios.nombre as usuario_nombre,
+        usuarios.email as usuario_email
+      `)
+      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
+      .orderBy('logs_actividad.created_at', 'DESC')
+      .limit(limit)
+      .get();
+  }
 
-    let baseQuery = this.where('created_at', '>=', startDate);
-    
-    if (usuario_id) {
-      baseQuery = baseQuery.where('usuario_id', usuario_id);
-    }
-
-    const totalActivities = await baseQuery.count();
-
-    const byAction = await this.raw(`
-      SELECT accion, COUNT(*) as count
-      FROM log_actividades
-      WHERE created_at >= ? ${usuario_id ? 'AND usuario_id = ?' : ''}
-      GROUP BY accion
-      ORDER BY count DESC
-    `, usuario_id ? [startDate, usuario_id] : [startDate]);
-
-    const byEntity = await this.raw(`
-      SELECT entidad_tipo, COUNT(*) as count
-      FROM log_actividades
-      WHERE created_at >= ? ${usuario_id ? 'AND usuario_id = ?' : ''}
-      GROUP BY entidad_tipo
-      ORDER BY count DESC
-    `, usuario_id ? [startDate, usuario_id] : [startDate]);
-
-    const dailyActivity = await this.raw(`
+  /**
+   * Obtiene estadísticas de actividad por usuario
+   */
+  async getUserActivityStats(usuario_id) {
+    const stats = await this.execute(`
       SELECT 
-        DATE(created_at) as fecha,
-        COUNT(*) as actividades
-      FROM log_actividades
-      WHERE created_at >= ? ${usuario_id ? 'AND usuario_id = ?' : ''}
-      GROUP BY DATE(created_at)
+        accion,
+        COUNT(*) as total,
+        DATE(created_at) as fecha
+      FROM logs_actividad
+      WHERE usuario_id = ?
+      GROUP BY accion, DATE(created_at)
       ORDER BY fecha DESC
-    `, usuario_id ? [startDate, usuario_id] : [startDate]);
+    `, [usuario_id]);
+
+    const totalActivities = await this.execute(`
+      SELECT COUNT(*) as total
+      FROM logs_actividad
+      WHERE usuario_id = ?
+    `, [usuario_id]);
+
+    const recentActivities = await this.execute(`
+      SELECT COUNT(*) as total
+      FROM logs_actividad
+      WHERE usuario_id = ? 
+        AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    `, [usuario_id]);
 
     return {
-      totalActivities,
-      byAction: byAction.reduce((acc, item) => {
-        acc[item.accion] = item.count;
-        return acc;
-      }, {}),
-      byEntity: byEntity.reduce((acc, item) => {
-        acc[item.entidad_tipo] = item.count;
-        return acc;
-      }, {}),
-      dailyActivity
+      stats,
+      total: totalActivities[0].total,
+      recent: recentActivities[0].total
     };
+  }
+
+  /**
+   * Obtiene el historial de cambios de una entidad específica
+   */
+  async getEntityHistory(entidad_tipo, entidad_id, limit = 50, offset = 0) {
+    return await this
+      .select(`
+        logs_actividad.*,
+        usuarios.nombre as usuario_nombre,
+        usuarios.email as usuario_email
+      `)
+      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
+      .where('logs_actividad.entidad_tipo', entidad_tipo)
+      .where('logs_actividad.entidad_id', entidad_id)
+      .orderBy('logs_actividad.created_at', 'ASC')
+      .limit(limit)
+      .offset(offset)
+      .get();
+  }
+
+  /**
+   * Busca actividades por descripción
+   */
+  async searchActivities(searchTerm, limit = 50, offset = 0) {
+    return await this
+      .select(`
+        logs_actividad.*,
+        usuarios.nombre as usuario_nombre,
+        usuarios.email as usuario_email
+      `)
+      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
+      .where('logs_actividad.descripcion', 'LIKE', `%${searchTerm}%`)
+      .orderBy('logs_actividad.created_at', 'DESC')
+      .limit(limit)
+      .offset(offset)
+      .get();
+  }
+
+  /**
+   * Obtiene actividades por IP
+   */
+  async getByIpAddress(ip_address, limit = 50, offset = 0) {
+    return await this
+      .select(`
+        logs_actividad.*,
+        usuarios.nombre as usuario_nombre,
+        usuarios.email as usuario_email
+      `)
+      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
+      .where('logs_actividad.ip_address', ip_address)
+      .orderBy('logs_actividad.created_at', 'DESC')
+      .limit(limit)
+      .offset(offset)
+      .get();
+  }
+
+  /**
+   * Obtiene resumen de actividades del sistema
+   */
+  async getActivitySummary() {
+    const totalActivities = await this.execute(`
+      SELECT COUNT(*) as total
+      FROM logs_actividad
+    `);
+
+    const activitiesByAction = await this.execute(`
+      SELECT 
+        accion,
+        COUNT(*) as total
+      FROM logs_actividad
+      GROUP BY accion
+      ORDER BY total DESC
+    `);
+
+    const activitiesByEntity = await this.execute(`
+      SELECT 
+        entidad_tipo,
+        COUNT(*) as total
+      FROM logs_actividad
+      GROUP BY entidad_tipo
+      ORDER BY total DESC
+    `);
+
+    const recentActivities = await this.execute(`
+      SELECT COUNT(*) as total
+      FROM logs_actividad
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+    `);
+
+    const topUsers = await this.execute(`
+      SELECT 
+        u.nombre,
+        u.email,
+        COUNT(la.id) as total_activities
+      FROM logs_actividad la
+      LEFT JOIN usuarios u ON la.usuario_id = u.id
+      GROUP BY la.usuario_id, u.nombre, u.email
+      ORDER BY total_activities DESC
+      LIMIT 10
+    `);
+
+    const activitiesByHour = await this.execute(`
+      SELECT 
+        HOUR(created_at) as hora,
+        COUNT(*) as total
+      FROM logs_actividad
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+      GROUP BY HOUR(created_at)
+      ORDER BY hora
+    `);
+
+    return {
+      total: totalActivities[0].total,
+      by_action: activitiesByAction,
+      by_entity: activitiesByEntity,
+      recent: recentActivities[0].total,
+      top_users: topUsers,
+      by_hour: activitiesByHour
+    };
+  }
+
+  /**
+   * Obtiene actividades en un rango de fechas
+   */
+  async getActivitiesInDateRange(startDate, endDate, usuario_id = null) {
+    let query = this
+      .select(`
+        logs_actividad.*,
+        usuarios.nombre as usuario_nombre,
+        usuarios.email as usuario_email
+      `)
+      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
+      .whereBetween('logs_actividad.created_at', [startDate, endDate]);
+
+    if (usuario_id) {
+      query = query.where('logs_actividad.usuario_id', usuario_id);
+    }
+
+    return await query
+      .orderBy('logs_actividad.created_at', 'ASC')
+      .get();
   }
 
   /**
@@ -260,357 +403,6 @@ class LogActivityRepository extends BaseRepository {
   }
 
   /**
-   * Registra la asignación de una entidad
-   */
-  async logAssign(usuario_id, entidad_tipo, entidad_id, descripcion, datos_nuevos = null, ip_address = null) {
-    return await this.logActivity({
-      usuario_id,
-      accion: 'asignar',
-      entidad_tipo,
-      entidad_id,
-      descripcion,
-      datos_nuevos,
-      ip_address
-    });
-  }
-
-  /**
-   * Registra la finalización de una entidad
-   */
-  async logComplete(usuario_id, entidad_tipo, entidad_id, descripcion, datos_nuevos = null, ip_address = null) {
-    return await this.logActivity({
-      usuario_id,
-      accion: 'completar',
-      entidad_tipo,
-      entidad_id,
-      descripcion,
-      datos_nuevos,
-      ip_address
-    });
-  }
-
-  /**
-   * Registra la cancelación de una entidad
-   */
-  async logCancel(usuario_id, entidad_tipo, entidad_id, descripcion, datos_nuevos = null, ip_address = null) {
-    return await this.logActivity({
-      usuario_id,
-      accion: 'cancelar',
-      entidad_tipo,
-      entidad_id,
-      descripcion,
-      datos_nuevos,
-      ip_address
-    });
-  }
-
-  /**
-   * Obtiene actividades recientes del sistema
-   */
-  async getRecentActivities(limit = 20) {
-    return await this
-      .select(`
-        log_actividades.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'log_actividades.usuario_id', 'usuarios.id')
-      .orderBy('log_actividades.created_at', 'DESC')
-      .limit(limit)
-      .get();
-  }
-
-  /**
-   * Obtiene estadísticas de actividad por usuario
-   */
-  async getUserActivityStats(usuario_id, dias = 30) {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - dias);
-
-    const totalActivities = await this
-      .where('usuario_id', usuario_id)
-      .where('created_at', '>=', startDate)
-      .count();
-
-    const byAction = await this.raw(`
-      SELECT accion, COUNT(*) as count
-      FROM log_actividades
-      WHERE usuario_id = ? AND created_at >= ?
-      GROUP BY accion
-      ORDER BY count DESC
-    `, [usuario_id, startDate]);
-
-    const byEntity = await this.raw(`
-      SELECT entidad_tipo, COUNT(*) as count
-      FROM log_actividades
-      WHERE usuario_id = ? AND created_at >= ?
-      GROUP BY entidad_tipo
-      ORDER BY count DESC
-    `, [usuario_id, startDate]);
-
-    const hourlyDistribution = await this.raw(`
-      SELECT 
-        HOUR(created_at) as hora,
-        COUNT(*) as actividades
-      FROM log_actividades
-      WHERE usuario_id = ? AND created_at >= ?
-      GROUP BY HOUR(created_at)
-      ORDER BY hora
-    `, [usuario_id, startDate]);
-
-    const lastLogin = await this
-      .where('usuario_id', usuario_id)
-      .where('accion', 'login')
-      .orderBy('created_at', 'DESC')
-      .first();
-
-    return {
-      totalActivities,
-      byAction: byAction.reduce((acc, item) => {
-        acc[item.accion] = item.count;
-        return acc;
-      }, {}),
-      byEntity: byEntity.reduce((acc, item) => {
-        acc[item.entidad_tipo] = item.count;
-        return acc;
-      }, {}),
-      hourlyDistribution,
-      lastLogin: lastLogin ? lastLogin.created_at : null
-    };
-  }
-
-  /**
-   * Obtiene el historial de cambios de una entidad específica
-   */
-  async getEntityHistory(entidad_tipo, entidad_id) {
-    const activities = await this
-      .select(`
-        log_actividades.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'log_actividades.usuario_id', 'usuarios.id')
-      .where('log_actividades.entidad_tipo', entidad_tipo)
-      .where('log_actividades.entidad_id', entidad_id)
-      .orderBy('log_actividades.created_at', 'ASC')
-      .get();
-
-    // Parsear los datos JSON
-    return activities.map(activity => ({
-      ...activity,
-      datos_anteriores: activity.datos_anteriores ? JSON.parse(activity.datos_anteriores) : null,
-      datos_nuevos: activity.datos_nuevos ? JSON.parse(activity.datos_nuevos) : null
-    }));
-  }
-
-  /**
-   * Busca actividades por descripción
-   */
-  async searchByDescription(searchTerm, limit = 50, offset = 0) {
-    return await this
-      .select(`
-        log_actividades.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'log_actividades.usuario_id', 'usuarios.id')
-      .where('log_actividades.descripcion', 'LIKE', `%${searchTerm}%`)
-      .orderBy('log_actividades.created_at', 'DESC')
-      .limit(limit)
-      .offset(offset)
-      .get();
-  }
-
-  /**
-   * Obtiene actividades por IP
-   */
-  async getByIpAddress(ip_address, limit = 50, offset = 0) {
-    return await this
-      .select(`
-        log_actividades.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'log_actividades.usuario_id', 'usuarios.id')
-      .where('log_actividades.ip_address', ip_address)
-      .orderBy('log_actividades.created_at', 'DESC')
-      .limit(limit)
-      .offset(offset)
-      .get();
-  }
-
-  /**
-   * Obtener estadísticas del sistema
-   * @param {number} days - Días hacia atrás para las estadísticas
-   * @returns {Promise<Object>} Estadísticas del sistema
-   */
-  async getSystemStats(days = 30) {
-    try {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const query = `
-        SELECT 
-          accion,
-          entidad_tipo,
-          COUNT(*) as total,
-          DATE(created_at) as fecha
-        FROM logs_actividad 
-        WHERE created_at >= ?
-        GROUP BY accion, entidad_tipo, DATE(created_at)
-        ORDER BY fecha DESC, total DESC
-      `;
-
-      const [rows] = await this.pool.execute(query, [startDate]);
-      return rows;
-    } catch (error) {
-      console.error('Error getting system stats:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Obtener estadísticas de actividad de un usuario específico
-   * @param {number} userId - ID del usuario
-   * @param {number} days - Días hacia atrás para las estadísticas
-   * @returns {Promise<Object>} Estadísticas del usuario
-   */
-  async getUserActivityStats(userId, days = 30) {
-    try {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const query = `
-        SELECT 
-          accion,
-          entidad_tipo,
-          COUNT(*) as total,
-          DATE(created_at) as fecha
-        FROM logs_actividad 
-        WHERE usuario_id = ? AND created_at >= ?
-        GROUP BY accion, entidad_tipo, DATE(created_at)
-        ORDER BY fecha DESC, total DESC
-      `;
-
-      const [rows] = await this.pool.execute(query, [userId, startDate]);
-      return rows;
-    } catch (error) {
-      console.error('Error getting user activity stats:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Obtener logs por rango de fechas
-   * @param {Date} startDate - Fecha de inicio
-   * @param {Date} endDate - Fecha de fin
-   * @param {number} limit - Límite de resultados
-   * @param {number} offset - Offset para paginación
-   * @returns {Promise<Array>} Lista de logs
-   */
-  async getByDateRange(startDate, endDate, limit = 50, offset = 0) {
-    try {
-      const query = `
-        SELECT 
-          la.*,
-          u.nombre as usuario_nombre,
-          u.email as usuario_email
-        FROM logs_actividad la
-        LEFT JOIN usuarios u ON la.usuario_id = u.id
-        WHERE la.created_at BETWEEN ? AND ?
-        ORDER BY la.created_at DESC
-        LIMIT ? OFFSET ?
-      `;
-
-      const [rows] = await this.pool.execute(query, [startDate, endDate, limit, offset]);
-      
-      return rows.map(row => ({
-        ...row,
-        datos_anteriores: row.datos_anteriores ? JSON.parse(row.datos_anteriores) : null,
-        datos_nuevos: row.datos_nuevos ? JSON.parse(row.datos_nuevos) : null
-      }));
-    } catch (error) {
-      console.error('Error getting logs by date range:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Obtener logs por acción específica
-   * @param {string} action - Acción a filtrar
-   * @param {number} limit - Límite de resultados
-   * @param {number} offset - Offset para paginación
-   * @returns {Promise<Array>} Lista de logs
-   */
-  async getByAction(action, limit = 50, offset = 0) {
-    try {
-      const query = `
-        SELECT 
-          la.*,
-          u.nombre as usuario_nombre,
-          u.email as usuario_email
-        FROM logs_actividad la
-        LEFT JOIN usuarios u ON la.usuario_id = u.id
-        WHERE la.accion = ?
-        ORDER BY la.created_at DESC
-        LIMIT ? OFFSET ?
-      `;
-
-      const [rows] = await this.pool.execute(query, [action, limit, offset]);
-      
-      return rows.map(row => ({
-        ...row,
-        datos_anteriores: row.datos_anteriores ? JSON.parse(row.datos_anteriores) : null,
-        datos_nuevos: row.datos_nuevos ? JSON.parse(row.datos_nuevos) : null
-      }));
-    } catch (error) {
-      console.error('Error getting logs by action:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Exportar logs para auditoría
-   * @param {Date} startDate - Fecha de inicio
-   * @param {Date} endDate - Fecha de fin
-   * @param {number|null} userId - ID del usuario (opcional)
-   * @returns {Promise<Array>} Lista completa de logs para exportación
-   */
-  async exportLogsForAudit(startDate, endDate, userId = null) {
-    try {
-      let query = `
-        SELECT 
-          la.*,
-          u.nombre as usuario_nombre,
-          u.email as usuario_email
-        FROM logs_actividad la
-        LEFT JOIN usuarios u ON la.usuario_id = u.id
-        WHERE la.created_at BETWEEN ? AND ?
-      `;
-      
-      const params = [startDate, endDate];
-      
-      if (userId) {
-        query += ' AND la.usuario_id = ?';
-        params.push(userId);
-      }
-      
-      query += ' ORDER BY la.created_at DESC';
-
-      const [rows] = await this.pool.execute(query, params);
-      
-      return rows.map(row => ({
-        ...row,
-        datos_anteriores: row.datos_anteriores ? JSON.parse(row.datos_anteriores) : null,
-        datos_nuevos: row.datos_nuevos ? JSON.parse(row.datos_nuevos) : null
-      }));
-    } catch (error) {
-      console.error('Error exporting logs for audit:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Limpia logs antiguos
    */
   async cleanupOldLogs(daysOld = 365) {
@@ -621,116 +413,24 @@ class LogActivityRepository extends BaseRepository {
   }
 
   /**
-   * Obtiene actividades sospechosas (múltiples intentos de login fallidos, etc.)
-   */
-  async getSuspiciousActivities(limit = 50) {
-    // Múltiples logins desde diferentes IPs en poco tiempo
-    const suspiciousLogins = await this.raw(`
-      SELECT 
-        usuario_id,
-        COUNT(DISTINCT ip_address) as ips_diferentes,
-        COUNT(*) as intentos_login,
-        MIN(created_at) as primer_intento,
-        MAX(created_at) as ultimo_intento
-      FROM log_actividades
-      WHERE accion = 'login' 
-        AND created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
-      GROUP BY usuario_id
-      HAVING ips_diferentes > 3 OR intentos_login > 10
-      ORDER BY intentos_login DESC
-      LIMIT ?
-    `, [limit]);
-
-    // Actividades desde IPs con muchos usuarios diferentes
-    const suspiciousIPs = await this.raw(`
-      SELECT 
-        ip_address,
-        COUNT(DISTINCT usuario_id) as usuarios_diferentes,
-        COUNT(*) as total_actividades
-      FROM log_actividades
-      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-        AND ip_address IS NOT NULL
-      GROUP BY ip_address
-      HAVING usuarios_diferentes > 5
-      ORDER BY usuarios_diferentes DESC
-      LIMIT ?
-    `, [limit]);
-
-    return {
-      suspiciousLogins,
-      suspiciousIPs
-    };
-  }
-
-  /**
-   * Obtiene el resumen de actividades de un proyecto
-   */
-  async getProjectActivitySummary(proyecto_id, dias = 30) {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - dias);
-
-    // Actividades directas del proyecto
-    const projectActivities = await this
-      .where('entidad_tipo', 'proyecto')
-      .where('entidad_id', proyecto_id)
-      .where('created_at', '>=', startDate)
-      .count();
-
-    // Actividades de tareas del proyecto
-    const taskActivities = await this.raw(`
-      SELECT COUNT(*) as count
-      FROM log_actividades la
-      INNER JOIN tareas t ON la.entidad_id = t.id
-      WHERE la.entidad_tipo = 'tarea' 
-        AND t.proyecto_id = ?
-        AND la.created_at >= ?
-    `, [proyecto_id, startDate]);
-
-    // Usuarios más activos en el proyecto
-    const activeUsers = await this.raw(`
-      SELECT 
-        u.nombre,
-        u.email,
-        COUNT(la.id) as actividades
-      FROM log_actividades la
-      INNER JOIN usuarios u ON la.usuario_id = u.id
-      LEFT JOIN tareas t ON la.entidad_id = t.id AND la.entidad_tipo = 'tarea'
-      WHERE (
-        (la.entidad_tipo = 'proyecto' AND la.entidad_id = ?) OR
-        (la.entidad_tipo = 'tarea' AND t.proyecto_id = ?)
-      ) AND la.created_at >= ?
-      GROUP BY la.usuario_id, u.nombre, u.email
-      ORDER BY actividades DESC
-      LIMIT 10
-    `, [proyecto_id, proyecto_id, startDate]);
-
-    return {
-      projectActivities,
-      taskActivities: taskActivities[0]?.count || 0,
-      totalActivities: projectActivities + (taskActivities[0]?.count || 0),
-      activeUsers
-    };
-  }
-
-  /**
    * Exporta logs para auditoría
    */
   async exportLogsForAudit(startDate, endDate, usuario_id = null) {
     let query = this
       .select(`
-        log_actividades.*,
+        logs_actividad.*,
         usuarios.nombre as usuario_nombre,
         usuarios.email as usuario_email
       `)
-      .leftJoin('usuarios', 'log_actividades.usuario_id', 'usuarios.id')
-      .whereBetween('log_actividades.created_at', [startDate, endDate]);
+      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
+      .whereBetween('logs_actividad.created_at', [startDate, endDate]);
 
     if (usuario_id) {
-      query = query.where('log_actividades.usuario_id', usuario_id);
+      query = query.where('logs_actividad.usuario_id', usuario_id);
     }
 
     const logs = await query
-      .orderBy('log_actividades.created_at', 'ASC')
+      .orderBy('logs_actividad.created_at', 'ASC')
       .get();
 
     // Parsear los datos JSON para la exportación
