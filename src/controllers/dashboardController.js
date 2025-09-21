@@ -268,43 +268,61 @@ class DashboardController {
   }
 
   /**
-   * Obtener actividad reciente del sistema (solo admin)
-   * GET /api/dashboard/admin/activity
-   * Permisos: Solo administradores
+   * Obtiene la actividad reciente del sistema (solo para admins)
+   * @param {Object} req - Request object
+   * @param {Object} res - Response object
    */
   async getRecentActivity(req, res) {
     try {
-      const limit = parseInt(req.query.limit) || 10;
+      const { limit = 20, offset = 0, userId, entityType, action } = req.query;
+      
+      // Validar parámetros
+      const limitNum = Math.min(parseInt(limit) || 20, 100);
+      const offsetNum = parseInt(offset) || 0;
 
-      // Por ahora retornamos datos simulados
-      // En el futuro se implementará con el sistema de logs
-      const recentActivity = [
-        {
-          id: 1,
-          tipo: 'proyecto_creado',
-          descripcion: 'Nuevo proyecto creado: Sistema de Gestión',
-          usuario: 'Admin',
-          fecha: new Date().toISOString()
-        },
-        {
-          id: 2,
-          tipo: 'tarea_completada',
-          descripcion: 'Tarea completada: Implementar autenticación',
-          usuario: 'Juan Pérez',
-          fecha: new Date(Date.now() - 3600000).toISOString()
+      let activities;
+
+      if (userId) {
+        activities = await this.logRepository.getByUser(parseInt(userId), limitNum, offsetNum);
+      } else if (entityType && req.query.entityId) {
+        activities = await this.logRepository.getByEntity(entityType, parseInt(req.query.entityId), limitNum, offsetNum);
+      } else if (action) {
+        activities = await this.logRepository.getByAction(action, limitNum, offsetNum);
+      } else {
+        activities = await this.logRepository.getRecentActivities(limitNum);
+      }
+
+      // Formatear las actividades para el frontend
+      const formattedActivities = activities.map(activity => ({
+        id: activity.id,
+        tipo: activity.entidad_tipo,
+        accion: activity.accion,
+        elemento: activity.descripcion || `${activity.entidad_tipo} ID ${activity.entidad_id}`,
+        usuario: activity.usuario_nombre || 'Usuario desconocido',
+        fecha: activity.created_at,
+        ip_address: activity.ip_address,
+        detalles: {
+          entidad_id: activity.entidad_id,
+          datos_anteriores: activity.datos_anteriores,
+          datos_nuevos: activity.datos_nuevos
         }
-      ];
+      }));
 
       res.json({
         success: true,
-        data: recentActivity.slice(0, limit)
+        data: formattedActivities,
+        pagination: {
+          limit: limitNum,
+          offset: offsetNum,
+          total: formattedActivities.length
+        }
       });
 
     } catch (error) {
-      console.error('Error obteniendo actividad reciente:', error);
+      console.error('Error fetching recent activity:', error);
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor'
+        message: 'Error al obtener la actividad reciente'
       });
     }
   }

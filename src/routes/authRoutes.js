@@ -45,11 +45,11 @@ router.post('/login', async (req, res, next) => {
 });
 
 /**
- * @route   POST /api/auth/verify
+ * @route   GET /api/auth/verify
  * @desc    Verificar token JWT
  * @access  Public
  */
-router.post('/verify', async (req, res) => {
+router.get('/verify', async (req, res) => {
   await authController.verifyToken(req, res);
 });
 

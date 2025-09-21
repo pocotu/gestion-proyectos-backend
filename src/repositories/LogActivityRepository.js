@@ -440,67 +440,174 @@ class LogActivityRepository extends BaseRepository {
   }
 
   /**
-   * Obtiene estadísticas generales del sistema
+   * Obtener estadísticas del sistema
+   * @param {number} days - Días hacia atrás para las estadísticas
+   * @returns {Promise<Object>} Estadísticas del sistema
    */
-  async getSystemStats(dias = 30) {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - dias);
+  async getSystemStats(days = 30) {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
 
-    const totalActivities = await this.where('created_at', '>=', startDate).count();
+      const query = `
+        SELECT 
+          accion,
+          entidad_tipo,
+          COUNT(*) as total,
+          DATE(created_at) as fecha
+        FROM logs_actividad 
+        WHERE created_at >= ?
+        GROUP BY accion, entidad_tipo, DATE(created_at)
+        ORDER BY fecha DESC, total DESC
+      `;
 
-    const mostActiveUsers = await this.raw(`
-      SELECT 
-        u.nombre,
-        u.email,
-        COUNT(la.id) as actividades
-      FROM log_actividades la
-      INNER JOIN usuarios u ON la.usuario_id = u.id
-      WHERE la.created_at >= ?
-      GROUP BY la.usuario_id, u.nombre, u.email
-      ORDER BY actividades DESC
-      LIMIT 10
-    `, [startDate]);
+      const [rows] = await this.pool.execute(query, [startDate]);
+      return rows;
+    } catch (error) {
+      console.error('Error getting system stats:', error);
+      throw error;
+    }
+  }
 
-    const activityByHour = await this.raw(`
-      SELECT 
-        HOUR(created_at) as hora,
-        COUNT(*) as actividades
-      FROM log_actividades
-      WHERE created_at >= ?
-      GROUP BY HOUR(created_at)
-      ORDER BY hora
-    `, [startDate]);
+  /**
+   * Obtener estadísticas de actividad de un usuario específico
+   * @param {number} userId - ID del usuario
+   * @param {number} days - Días hacia atrás para las estadísticas
+   * @returns {Promise<Object>} Estadísticas del usuario
+   */
+  async getUserActivityStats(userId, days = 30) {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
 
-    const topIPs = await this.raw(`
-      SELECT 
-        ip_address,
-        COUNT(*) as actividades,
-        COUNT(DISTINCT usuario_id) as usuarios_unicos
-      FROM log_actividades
-      WHERE created_at >= ? AND ip_address IS NOT NULL
-      GROUP BY ip_address
-      ORDER BY actividades DESC
-      LIMIT 10
-    `, [startDate]);
+      const query = `
+        SELECT 
+          accion,
+          entidad_tipo,
+          COUNT(*) as total,
+          DATE(created_at) as fecha
+        FROM logs_actividad 
+        WHERE usuario_id = ? AND created_at >= ?
+        GROUP BY accion, entidad_tipo, DATE(created_at)
+        ORDER BY fecha DESC, total DESC
+      `;
 
-    const entityActivity = await this.raw(`
-      SELECT 
-        entidad_tipo,
-        accion,
-        COUNT(*) as count
-      FROM log_actividades
-      WHERE created_at >= ?
-      GROUP BY entidad_tipo, accion
-      ORDER BY entidad_tipo, count DESC
-    `, [startDate]);
+      const [rows] = await this.pool.execute(query, [userId, startDate]);
+      return rows;
+    } catch (error) {
+      console.error('Error getting user activity stats:', error);
+      throw error;
+    }
+  }
 
-    return {
-      totalActivities,
-      mostActiveUsers,
-      activityByHour,
-      topIPs,
-      entityActivity
-    };
+  /**
+   * Obtener logs por rango de fechas
+   * @param {Date} startDate - Fecha de inicio
+   * @param {Date} endDate - Fecha de fin
+   * @param {number} limit - Límite de resultados
+   * @param {number} offset - Offset para paginación
+   * @returns {Promise<Array>} Lista de logs
+   */
+  async getByDateRange(startDate, endDate, limit = 50, offset = 0) {
+    try {
+      const query = `
+        SELECT 
+          la.*,
+          u.nombre as usuario_nombre,
+          u.email as usuario_email
+        FROM logs_actividad la
+        LEFT JOIN usuarios u ON la.usuario_id = u.id
+        WHERE la.created_at BETWEEN ? AND ?
+        ORDER BY la.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      const [rows] = await this.pool.execute(query, [startDate, endDate, limit, offset]);
+      
+      return rows.map(row => ({
+        ...row,
+        datos_anteriores: row.datos_anteriores ? JSON.parse(row.datos_anteriores) : null,
+        datos_nuevos: row.datos_nuevos ? JSON.parse(row.datos_nuevos) : null
+      }));
+    } catch (error) {
+      console.error('Error getting logs by date range:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener logs por acción específica
+   * @param {string} action - Acción a filtrar
+   * @param {number} limit - Límite de resultados
+   * @param {number} offset - Offset para paginación
+   * @returns {Promise<Array>} Lista de logs
+   */
+  async getByAction(action, limit = 50, offset = 0) {
+    try {
+      const query = `
+        SELECT 
+          la.*,
+          u.nombre as usuario_nombre,
+          u.email as usuario_email
+        FROM logs_actividad la
+        LEFT JOIN usuarios u ON la.usuario_id = u.id
+        WHERE la.accion = ?
+        ORDER BY la.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      const [rows] = await this.pool.execute(query, [action, limit, offset]);
+      
+      return rows.map(row => ({
+        ...row,
+        datos_anteriores: row.datos_anteriores ? JSON.parse(row.datos_anteriores) : null,
+        datos_nuevos: row.datos_nuevos ? JSON.parse(row.datos_nuevos) : null
+      }));
+    } catch (error) {
+      console.error('Error getting logs by action:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Exportar logs para auditoría
+   * @param {Date} startDate - Fecha de inicio
+   * @param {Date} endDate - Fecha de fin
+   * @param {number|null} userId - ID del usuario (opcional)
+   * @returns {Promise<Array>} Lista completa de logs para exportación
+   */
+  async exportLogsForAudit(startDate, endDate, userId = null) {
+    try {
+      let query = `
+        SELECT 
+          la.*,
+          u.nombre as usuario_nombre,
+          u.email as usuario_email
+        FROM logs_actividad la
+        LEFT JOIN usuarios u ON la.usuario_id = u.id
+        WHERE la.created_at BETWEEN ? AND ?
+      `;
+      
+      const params = [startDate, endDate];
+      
+      if (userId) {
+        query += ' AND la.usuario_id = ?';
+        params.push(userId);
+      }
+      
+      query += ' ORDER BY la.created_at DESC';
+
+      const [rows] = await this.pool.execute(query, params);
+      
+      return rows.map(row => ({
+        ...row,
+        datos_anteriores: row.datos_anteriores ? JSON.parse(row.datos_anteriores) : null,
+        datos_nuevos: row.datos_nuevos ? JSON.parse(row.datos_nuevos) : null
+      }));
+    } catch (error) {
+      console.error('Error exporting logs for audit:', error);
+      throw error;
+    }
   }
 
   /**
