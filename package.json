@@ -7,6 +7,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest",
+    "setup:render": "node render-setup.js",
+    "setup:db": "node test-db-setup.js",
     "seed": "node src/seeders/index.js",
     "seed:refresh": "node src/seeders/index.js refresh",
     "seed:truncate": "node src/seeders/index.js truncate",
