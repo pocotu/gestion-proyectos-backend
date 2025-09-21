@@ -419,7 +419,7 @@ describe('Projects Integration Tests - MVP', () => {
         .post('/api/projects')
         .set(userWithRole.headers)
         .send(projectData)
-        .expect(200);
+        .expect(201);
 
       expect(response.body.success).toBe(true);
       

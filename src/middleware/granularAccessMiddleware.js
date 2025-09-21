@@ -48,7 +48,12 @@ class GranularAccessMiddleware {
         }
 
         if (!projectId) {
-          // Para creación de proyectos, verificar que tenga rol de responsable_proyecto
+          // Para creación de proyectos, verificar que tenga rol de responsable_proyecto o sea admin
+          if (req.user.es_administrador) {
+            next();
+            return;
+          }
+          
           const userRoles = await this.userRoleRepository.getUserRoles(userId);
           const hasProjectRole = userRoles.some(role => role.rol_nombre === 'responsable_proyecto');
           

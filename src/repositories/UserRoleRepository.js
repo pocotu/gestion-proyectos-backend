@@ -1,4 +1,5 @@
 const BaseRepository = require('./BaseRepository');
+const { pool } = require('../config/db');
 
 /**
  * UserRoleRepository - Repositorio para la relación muchos-a-muchos usuarios-roles
@@ -28,7 +29,7 @@ class UserRoleRepository extends BaseRepository {
       throw new Error('El usuario ya tiene este rol asignado');
     }
 
-    return await this.create({
+    return await this.insert({
       usuario_id,
       rol_id,
       created_at: new Date()

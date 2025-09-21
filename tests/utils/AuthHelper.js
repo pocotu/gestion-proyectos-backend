@@ -193,6 +193,8 @@ class AuthHelper {
     
     // Asignar el rol específico al usuario usando el token de administrador
     try {
+      console.log(`Intentando asignar rol ${role} al usuario ${user.id}`);
+      
       const roleAssignResponse = await request(app)
         .post('/api/roles/assign')
         .set('Authorization', `Bearer ${adminAuth.token}`)
@@ -201,8 +203,20 @@ class AuthHelper {
           roleIdentifier: role
         });
         
+      console.log(`Respuesta de asignación de rol:`, roleAssignResponse.status, roleAssignResponse.body);
+        
       if (roleAssignResponse.status !== 200) {
         console.warn(`Error al asignar rol ${role}:`, roleAssignResponse.body);
+        // Intentar con el formato alternativo
+        const altRoleAssignResponse = await request(app)
+          .post('/api/roles/assign')
+          .set('Authorization', `Bearer ${adminAuth.token}`)
+          .send({
+            usuario_id: user.id,
+            rol_nombre: role
+          });
+          
+        console.log(`Respuesta alternativa de asignación de rol:`, altRoleAssignResponse.status, altRoleAssignResponse.body);
       }
     } catch (error) {
       console.warn(`No se pudo asignar el rol ${role} al usuario:`, error.message);
@@ -226,9 +240,14 @@ class AuthHelper {
    */
   async createTestUser() {
     this.testUserCounter++;
+    
+    // Generar un timestamp único para evitar duplicados
+    const timestamp = Date.now();
+    const uniqueId = `${this.testUserCounter}_${timestamp}`;
+    
     const userData = {
-      nombre: `Test User ${this.testUserCounter}`,
-      email: `testuser${this.testUserCounter}@test.com`,
+      nombre: `Test User ${uniqueId}`,
+      email: `testuser${uniqueId}@test.com`,
       contraseña: 'password123',
       telefono: `555123456${this.testUserCounter}`
     };

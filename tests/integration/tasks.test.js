@@ -31,48 +31,33 @@ describe('Tasks Integration Tests - MVP', () => {
     db = new DatabaseHelper();
     await db.initialize();
     
-    // Crear usuarios de prueba
-    const adminData = {
-      nombre: 'Admin User',
-      email: 'admin@test.com',
-      contraseña: 'password123',
-      telefono: '1234567890',
-      es_administrador: true
-    };
-
-    const userData = {
-      nombre: 'Regular User',
-      email: 'user@test.com',
-      contraseña: 'password123',
-      telefono: '0987654321'
-    };
-
-    // Registrar usuarios
-    const adminResponse = await request(app)
-      .post('/api/auth/register')
-      .send(adminData);
+    // Crear usuarios usando AuthHelper
+    const adminAuth = await authHelper.createAdminAndGetToken();
+    const userAuth = await authHelper.createUserWithRoleAndGetToken('responsable_tarea');
     
-    const userResponse = await request(app)
-      .post('/api/auth/register')
-      .send(userData);
+    adminToken = adminAuth.token;
+    userToken = userAuth.token;
+    adminUser = adminAuth.user;
+    regularUser = userAuth.user;
 
-    adminToken = adminResponse.body.data?.token || adminResponse.body.token;
-    userToken = userResponse.body.data?.token || userResponse.body.token;
-    adminUser = adminResponse.body.user;
-    regularUser = userResponse.body.user;
-
-    // Crear proyecto de prueba
+    // Crear proyecto de prueba con título único
+    const uniqueTitle = `Proyecto de Prueba ${Date.now()}`;
     const projectResponse = await request(app)
       .post('/api/projects')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        titulo: 'Proyecto de Prueba',
+        titulo: uniqueTitle,
         descripcion: 'Proyecto para tests de tareas',
         fecha_inicio: '2024-01-01',
         fecha_fin: '2024-12-31'
       });
     
     testProject = projectResponse.body.project;
+    
+    // Verificar que el proyecto se creó correctamente
+    if (!testProject || !testProject.id) {
+      throw new Error('Error creando proyecto de prueba: ' + JSON.stringify(projectResponse.body));
+    }
     
     logger.success('Entorno de tests configurado exitosamente');
   }, 30000);
@@ -821,12 +806,12 @@ describe('Tasks Integration Tests - MVP', () => {
     test('Debe cambiar estado de la tarea', async () => {
       logger.info('Test: Cambiar estado de la tarea');
       
-      const { headers: adminHeaders, user: adminUser } = await authHelper.createAdminAndGetToken();
+      const { headers: adminHeaders, user: adminUser, token: adminToken } = await authHelper.createAdminAndGetToken();
       const project = await createTestProject(adminUser.id);
       const task = await createTestTask({
         ...getTestTaskData(),
         proyecto_id: project.id
-      });
+      }, adminToken);
 
       const response = await request(app)
         .put(changeStatusEndpoint(task.id))

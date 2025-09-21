@@ -98,9 +98,10 @@ class DatabaseHelper {
    * Crea un usuario de prueba básico
    */
   async createTestUser(userData = {}) {
+    const timestamp = Date.now();
     const defaultUser = {
       nombre: 'Usuario Test',
-      email: 'test@example.com',
+      email: `test${timestamp}@example.com`,
       contraseña: '$2b$10$hashedpassword', // Password hasheado
       telefono: '1234567890',
       estado: true,
