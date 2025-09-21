@@ -55,7 +55,7 @@ async function renderDatabaseSetup() {
     console.log('');
     console.log('🔑 [RENDER-SETUP] CREDENCIALES DE ADMINISTRADOR:');
     console.log('   📧 Email: admin@gestion-proyectos.com');
-    console.log('   🔒 Password: Admin123!');
+    console.log('   🔒 Password: Admin123!!');
     console.log('   ⚠️  Cambia esta contraseña después del primer login');
     console.log('');
     

@@ -23,7 +23,7 @@ class UserSeeder extends BaseSeeder {
     const adminUser = {
       nombre: 'Administrador del Sistema',
       email: 'admin@gestion-proyectos.com',
-      contraseña: await this.hashPassword('admin123'),
+      contraseña: await this.hashPassword('Admin123!'),
       telefono: '+1234567890',
       estado: 1,
       es_administrador: 1

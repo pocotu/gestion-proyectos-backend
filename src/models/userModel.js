@@ -25,7 +25,7 @@ class UserModel {
 
   static async seedDefaultAdmin() {
     const adminEmail = 'admin@gestion-proyectos.com';
-    const adminPassword = 'Admin123!'; // Contraseña temporal fuerte
+    const adminPassword = 'Admin123!!!'; // Contraseña temporal fuerte
     
     console.log('🌱 [USER-MODEL] Verificando usuario administrador por defecto...');
     
