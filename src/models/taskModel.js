@@ -5,53 +5,40 @@ class TaskModel {
     const sql = `
       CREATE TABLE IF NOT EXISTS tareas (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        proyecto_id INT NOT NULL,
-        titulo VARCHAR(255) NOT NULL,
+        titulo VARCHAR(150) NOT NULL,
         descripcion TEXT,
-        estado ENUM('pendiente','en_progreso','en_revision','completada','cancelada') DEFAULT 'pendiente',
-        prioridad ENUM('baja','media','alta','critica') DEFAULT 'media',
         fecha_inicio DATE,
         fecha_fin DATE,
-        horas_trabajadas DECIMAL(5,2) DEFAULT 0,
+        estado ENUM('pendiente','en_progreso','completada','cancelada') DEFAULT 'pendiente',
+        prioridad ENUM('baja','media','alta') DEFAULT 'media',
+        proyecto_id INT NOT NULL,
         usuario_asignado_id INT,
-        creado_por INT,
-        padre_tarea_id INT DEFAULT NULL,
-        porcentaje_completado TINYINT DEFAULT 0,
+        creado_por INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE,
         FOREIGN KEY (usuario_asignado_id) REFERENCES usuarios(id) ON DELETE SET NULL,
-        FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
-        FOREIGN KEY (padre_tarea_id) REFERENCES tareas(id) ON DELETE SET NULL,
-        CHECK (porcentaje_completado >= 0 AND porcentaje_completado <= 100)
+        FOREIGN KEY (creado_por) REFERENCES usuarios(id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `;
     await pool.query(sql);
   }
 
-  static async create({ 
-    proyecto_id, 
-    titulo, 
-    descripcion, 
-    estado = 'pendiente',
-    prioridad = 'media',
-    fecha_inicio,
-    fecha_fin,
-    usuario_asignado_id,
-    creado_por,
-    padre_tarea_id = null
-  }) {
+  static async create({ titulo, descripcion, proyecto_id, usuario_asignado_id, creado_por, prioridad = 'media', estado = 'pendiente', fecha_inicio, fecha_fin }) {
     const sql = `
-      INSERT INTO tareas (
-        proyecto_id, titulo, descripcion, estado, prioridad, 
-        fecha_inicio, fecha_fin, 
-        usuario_asignado_id, creado_por, padre_tarea_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tareas (titulo, descripcion, proyecto_id, usuario_asignado_id, creado_por, prioridad, estado, fecha_inicio, fecha_fin) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await pool.execute(sql, [
-      proyecto_id, titulo, descripcion || null, estado, prioridad,
-      fecha_inicio || null, fecha_fin || null, 
-      usuario_asignado_id || null, creado_por || null, padre_tarea_id
+      titulo, 
+      descripcion || null, 
+      proyecto_id, 
+      usuario_asignado_id || null, 
+      creado_por, 
+      prioridad, 
+      estado, 
+      fecha_inicio || null, 
+      fecha_fin || null
     ]);
     return { id: result.insertId };
   }
@@ -102,41 +89,10 @@ class TaskModel {
     return rows;
   }
 
-  static async updateStatus(id, estado, porcentaje_completado = null) {
-    let sql = `UPDATE tareas SET estado = ?`;
-    let params = [estado];
-    
-    if (porcentaje_completado !== null) {
-      sql += `, porcentaje_completado = ?`;
-      params.push(porcentaje_completado);
-    }
-    
-    sql += ` WHERE id = ?`;
-    params.push(id);
-    
-    const [result] = await pool.execute(sql, params);
+  static async updateStatus(id, estado) {
+    const sql = `UPDATE tareas SET estado = ? WHERE id = ?`;
+    const [result] = await pool.execute(sql, [estado, id]);
     return result.affectedRows > 0;
-  }
-
-  static async updateHours(id, horas_trabajadas) {
-    const sql = `UPDATE tareas SET horas_trabajadas = ? WHERE id = ?`;
-    const [result] = await pool.execute(sql, [horas_trabajadas, id]);
-    return result.affectedRows > 0;
-  }
-
-  static async getSubtasks(padre_tarea_id) {
-    const sql = `
-      SELECT t.*, 
-             u1.nombre as asignado_nombre,
-             u2.nombre as creador_nombre
-      FROM tareas t
-      LEFT JOIN usuarios u1 ON t.usuario_asignado_id = u1.id
-      LEFT JOIN usuarios u2 ON t.creado_por = u2.id
-      WHERE t.padre_tarea_id = ?
-      ORDER BY t.created_at ASC
-    `;
-    const [rows] = await pool.execute(sql, [padre_tarea_id]);
-    return rows;
   }
 }
 

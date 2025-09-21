@@ -1,104 +1,319 @@
 /**
- * Tests de Integración - Proyectos
- * Valida todos los endpoints de proyectos requeridos por el frontend
- * Siguiendo principios SOLID y mejores prácticas de testing
+ * Tests de Integración - Proyectos MVP
+ * Valida endpoints básicos de proyectos para MVP
+ * Simplificado sin funcionalidades complejas
  */
 
 const request = require('supertest');
 const app = require('../../src/app');
 const DatabaseHelper = require('../utils/DatabaseHelper');
-const AuthHelper = require('../utils/AuthHelper');
 const TestLogger = require('../utils/TestLogger');
-const { getTestConfig } = require('../utils/TestConfig');
+const AuthHelper = require('../utils/AuthHelper');
 
-describe('Projects Integration Tests', () => {
+describe('Projects Integration Tests - MVP', () => {
   let db;
-  let authHelper;
   let logger;
-  let config;
+  let authHelper;
+  let adminToken;
+  let userToken;
+  let adminUser;
+  let regularUser;
 
   // Setup global para todos los tests
   beforeAll(async () => {
     logger = new TestLogger({ prefix: '[PROJECTS-TESTS]' });
-    config = getTestConfig();
+    authHelper = new AuthHelper();
     
-    logger.testStart('Configurando entorno de tests de proyectos');
+    logger.testStart('Configurando entorno de tests de proyectos MVP');
     
-    // Inicializar helpers
+    // Inicializar helper de base de datos
     db = new DatabaseHelper();
     await db.initialize();
     
-    authHelper = new AuthHelper(app, db);
+    // Crear usuarios usando AuthHelper
+    const adminAuth = await authHelper.createAdminAndGetToken();
+    const userAuth = await authHelper.createUserWithRoleAndGetToken('responsable_proyecto');
+    
+    adminToken = adminAuth.token;
+    userToken = userAuth.token;
+    adminUser = adminAuth.user;
+    regularUser = userAuth.user;
     
     logger.success('Entorno de tests configurado exitosamente');
   }, 30000);
 
   // Cleanup después de cada test
   afterEach(async () => {
-    await db.cleanTestData();
-    await authHelper.cleanup();
+    // Solo limpiar proyectos y tareas, no usuarios
+    if (db && db.connection) {
+      try {
+        await db.connection.execute('SET FOREIGN_KEY_CHECKS = 0');
+        await db.connection.execute('DELETE FROM tareas WHERE proyecto_id IN (SELECT id FROM proyectos WHERE titulo LIKE "%test%" OR titulo LIKE "%prueba%")');
+        await db.connection.execute('DELETE FROM proyectos WHERE titulo LIKE "%test%" OR titulo LIKE "%prueba%"');
+        await db.connection.execute('SET FOREIGN_KEY_CHECKS = 1');
+      } catch (error) {
+        console.error('Error limpiando datos de test:', error.message);
+      }
+    }
   });
 
   // Cleanup global
   afterAll(async () => {
     logger.testEnd('Finalizando tests de proyectos');
-    try {
-      await db.cleanup();
-      await db.close();
-    } catch (error) {
-      logger.error('Error en cleanup final', error);
-    }
-  }, 30000);
+    await db.close();
+  });
+
+  // Helper para crear proyecto de prueba usando la API
+  const createTestProject = async (projectData, token) => {
+    const data = projectData || {
+      titulo: 'Proyecto Test',
+      descripcion: 'Descripción del proyecto test',
+      fecha_inicio: '2024-01-01',
+      fecha_fin: '2024-12-31',
+      estado: 'activo'
+    };
+    
+    // Si no se proporciona token, usar el token de admin global
+    const authToken = token || adminToken;
+    
+    const response = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send(data);
+    // El controlador devuelve response.body.project
+    return response.body.project;
+  };
+
+  describe('POST /api/projects', () => {
+    test('Debe crear un proyecto exitosamente', async () => {
+      logger.info('Test: Crear proyecto');
+      
+      const projectData = {
+        titulo: 'Proyecto de Prueba',
+        descripcion: 'Descripción del proyecto de prueba',
+        fecha_inicio: '2024-01-01',
+        fecha_fin: '2024-12-31'
+      };
+      
+      console.log('Admin token:', adminToken);
+      console.log('Admin user:', adminUser);
+      
+      const response = await request(app)
+        .post('/api/projects')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(projectData);
+        
+      console.log('Response status:', response.status);
+      console.log('Response body:', JSON.stringify(response.body, null, 2));
+      
+      expect(response.status).toBe(201);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        project: {
+          id: expect.any(Number),
+          titulo: projectData.titulo,
+          descripcion: projectData.descripcion,
+          fecha_inicio: expect.any(String),
+          fecha_fin: expect.any(String),
+          estado: 'planificacion',
+          creado_por: adminUser.id
+        }
+      });
+      
+      logger.success('Proyecto creado correctamente');
+    });
+
+    test('Debe fallar al crear proyecto sin autorización', async () => {
+      const projectData = {
+        titulo: 'Proyecto Sin Auth',
+        descripcion: 'Descripción',
+        fecha_inicio: '2024-01-01',
+        fecha_fin: '2024-12-31'
+      };
+      
+      const response = await request(app)
+        .post('/api/projects')
+        .send(projectData)
+        .expect(401);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('Token de acceso requerido');
+      
+      logger.success('Validación de autorización funcionando');
+    });
+  });
 
   describe('GET /api/projects', () => {
     test('Debe listar proyectos como administrador', async () => {
       logger.info('Test: Listar proyectos como admin');
       
-      const { user: adminUser, headers: adminHeaders } = await authHelper.createAdminAndGetToken();
-      
-      // Crear algunos proyectos de prueba usando el ID del admin
-      await createTestProjects(3, adminUser.id);
+      // Crear algunos proyectos de prueba
+      await createTestProject({
+        titulo: 'Proyecto 1',
+        descripcion: 'Descripción 1',
+        fecha_inicio: '2024-01-01',
+        fecha_fin: '2024-06-30'
+      }, adminToken);
+
+      await createTestProject({
+        titulo: 'Proyecto 2',
+        descripcion: 'Descripción 2',
+        fecha_inicio: '2024-07-01',
+        fecha_fin: '2024-12-31'
+      }, adminToken);
 
       const response = await request(app)
         .get('/api/projects')
-        .set(adminHeaders)
-        .expect(201);
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
 
       expect(response.body).toMatchObject({
         success: true,
-        data: {
-          projects: expect.any(Array),
-          pagination: expect.any(Object)
-        }
+        projects: expect.any(Array)
       });
 
-      expect(response.body.data.projects.length).toBeGreaterThan(0);
+      expect(response.body.projects.length).toBeGreaterThanOrEqual(2);
       
       logger.success('Lista de proyectos obtenida correctamente');
     });
 
-    test('Debe listar solo proyectos accesibles para usuario regular', async () => {
+    test('Debe listar proyectos accesibles para usuario regular', async () => {
       logger.info('Test: Listar proyectos como usuario regular');
       
-      const { user, headers } = await authHelper.createUserAndGetToken();
-      
-      // Crear proyecto donde el usuario es responsable
-      const projectData = getTestProjectData();
-      const project = await createTestProject(projectData, user.id);
+      // Crear proyecto donde el usuario regular es creador
+      await createTestProject({
+        titulo: 'Mi Proyecto',
+        descripcion: 'Proyecto del usuario regular',
+        fecha_inicio: '2024-01-01',
+        fecha_fin: '2024-12-31'
+      }, userToken);
 
       const response = await request(app)
         .get('/api/projects')
-        .set(headers)
-        .expect(201);
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(200);
 
       expect(response.body).toMatchObject({
         success: true,
-        message: expect.any(String)
+        projects: expect.any(Array)
       });
       
       logger.success('Filtrado de proyectos por permisos funcionando');
     });
+  });
 
+  describe('GET /api/projects/:id', () => {
+    test('Debe obtener detalles de un proyecto específico', async () => {
+      logger.info('Test: Obtener detalles de proyecto');
+      
+      const project = await createTestProject({
+        titulo: 'Proyecto Detalle',
+        descripcion: 'Descripción detallada',
+        fecha_inicio: '2024-01-01',
+        fecha_fin: '2024-12-31'
+      }, adminToken);
+
+      const response = await request(app)
+        .get(`/api/projects/${project.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        project: {
+          id: project.id,
+          titulo: 'Proyecto Detalle',
+          descripcion: 'Descripción detallada',
+          estado: 'planificacion'
+        }
+      });
+      
+      logger.success('Detalles de proyecto obtenidos correctamente');
+    });
+
+    test('Debe fallar al obtener proyecto inexistente', async () => {
+      const response = await request(app)
+        .get('/api/projects/99999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('no encontrado');
+      
+      logger.success('Validación de proyecto inexistente funcionando');
+    });
+  });
+
+  describe('PUT /api/projects/:id', () => {
+    test('Debe actualizar un proyecto exitosamente', async () => {
+      logger.info('Test: Actualizar proyecto');
+      
+      const project = await createTestProject({
+        titulo: 'Proyecto Original',
+        descripcion: 'Descripción original',
+        fecha_inicio: '2024-01-01',
+        fecha_fin: '2024-12-31'
+      }, adminToken);
+
+      const updateData = {
+        titulo: 'Proyecto Actualizado',
+        descripcion: 'Descripción actualizada',
+        estado: 'en_progreso'
+      };
+
+      const response = await request(app)
+        .put(`/api/projects/${project.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        project: {
+          id: project.id,
+          titulo: updateData.titulo,
+          descripcion: updateData.descripcion,
+          estado: updateData.estado
+        }
+      });
+      
+      logger.success('Proyecto actualizado correctamente');
+    });
+  });
+
+  describe('DELETE /api/projects/:id', () => {
+    test('Debe eliminar un proyecto exitosamente', async () => {
+      logger.info('Test: Eliminar proyecto');
+      
+      const project = await createTestProject({
+        titulo: 'Proyecto a Eliminar',
+        descripcion: 'Este proyecto será eliminado',
+        fecha_inicio: '2024-01-01',
+        fecha_fin: '2024-12-31'
+      }, adminToken);
+
+      const response = await request(app)
+        .delete(`/api/projects/${project.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        message: expect.stringContaining('eliminado')
+      });
+      
+      // Verificar que el proyecto ya no existe
+      await request(app)
+        .get(`/api/projects/${project.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+      
+      logger.success('Proyecto eliminado correctamente');
+    });
+  });
+
+  describe('Funcionalidades adicionales', () => {
     test('Debe soportar paginación', async () => {
       logger.info('Test: Paginación de proyectos');
       
@@ -676,18 +891,18 @@ describe('Projects Integration Tests', () => {
     test('Debe buscar proyectos por término', async () => {
       logger.info('Test: Búsqueda de proyectos');
       
-      const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();
+      const { headers: adminHeaders, token: adminToken } = await authHelper.createAdminAndGetToken();
       
       // Crear proyecto con título específico
       await createTestProject({
         ...getTestProjectData(),
         titulo: 'Proyecto Búsqueda Específica'
-      });
+      }, adminToken);
 
       const response = await request(app)
         .get(`${searchProjectsEndpoint}?q=Búsqueda`)
         .set(adminHeaders)
-        .expect(400);
+        .expect(200);
 
       expect(response.body).toMatchObject({
         success: true,
@@ -715,7 +930,7 @@ describe('Projects Integration Tests', () => {
         .send(projectData)
         .expect(201);
 
-      const projectId = createResponse.body.data.project.id;
+      const projectId = createResponse.body.project.id;
 
       // 2. Obtener proyecto
       logger.debug('Paso 2: Obtener proyecto');
@@ -724,7 +939,7 @@ describe('Projects Integration Tests', () => {
         .set(adminHeaders)
         .expect(200);
 
-      expect(getResponse.body.data.project.id).toBe(projectId);
+      expect(getResponse.body.project.id).toBe(projectId);
 
       // 3. Actualizar proyecto
       logger.debug('Paso 3: Actualizar proyecto');
@@ -737,7 +952,7 @@ describe('Projects Integration Tests', () => {
         })
         .expect(200);
 
-      expect(updateResponse.body.data.project.titulo).toBe('Proyecto Flujo Actualizado');
+      expect(updateResponse.body.project.titulo).toBe('Proyecto Flujo Actualizado');
 
       // 4. Cambiar estado
       logger.debug('Paso 4: Cambiar estado');
@@ -747,7 +962,7 @@ describe('Projects Integration Tests', () => {
         .send({ estado: 'en_progreso' })
         .expect(200);
 
-      expect(statusResponse.body.data.project.estado).toBe('en_progreso');
+      expect(statusResponse.body.project.estado).toBe('en_progreso');
 
       // 5. Eliminar proyecto
       logger.debug('Paso 5: Eliminar proyecto');
@@ -772,47 +987,6 @@ describe('Projects Integration Tests', () => {
       descripcion: 'Descripción del proyecto de prueba',
       fecha_inicio: now.toISOString().split('T')[0],
       fecha_fin: futureDate.toISOString().split('T')[0]
-    };
-  }
-
-  async function createTestProject(projectData, createdBy = null) {
-    // Si no se proporciona createdBy, crear un usuario de prueba
-    let userId = createdBy;
-    if (!userId) {
-      const { user } = await authHelper.createUserAndGetToken({
-        email: `test-project-creator-${Date.now()}@example.com`
-      });
-      userId = user.id;
-    }
-
-    const query = `
-      INSERT INTO proyectos (titulo, descripcion, fecha_inicio, fecha_fin, creado_por, estado)
-      VALUES (?, ?, ?, ?, ?, 'planificacion')
-    `;
-    
-    const result = await db.query(query, [
-      projectData.titulo,
-      projectData.descripcion,
-      projectData.fecha_inicio,
-      projectData.fecha_fin,
-      userId
-    ]);
-
-    const projectId = result.insertId;
-
-    // Asignar al usuario como responsable principal del proyecto
-    const responsibleQuery = `
-      INSERT INTO proyecto_responsables (proyecto_id, usuario_id, rol_responsabilidad, activo, created_at)
-      VALUES (?, ?, 'responsable_principal', TRUE, NOW())
-    `;
-    
-    await db.query(responsibleQuery, [projectId, userId]);
-
-    return {
-      id: projectId,
-      ...projectData,
-      creado_por: userId,
-      estado: 'planificacion'
     };
   }
 

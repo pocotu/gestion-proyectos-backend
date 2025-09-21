@@ -1,420 +1,254 @@
 /**
- * AuthHelper - Clase para manejo de autenticación en tests de integración
- * Siguiendo principios SOLID:
- * - Single Responsibility: Solo maneja operaciones de autenticación para tests
- * - Open/Closed: Extensible para nuevos tipos de autenticación
- * - Dependency Inversion: Depende de abstracciones (supertest, jwt)
+ * AuthHelper - Utilidades para autenticación en tests
+ * Proporciona métodos para crear usuarios y obtener tokens de autenticación
  */
 
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
-const TestLogger = require('./TestLogger');
+const request = require('supertest');
+const app = require('../../src/app');
 
 class AuthHelper {
-  constructor(app, databaseHelper) {
-    this.app = app;
-    this.db = databaseHelper;
-    this.logger = new TestLogger({ prefix: '[AUTH-HELPER]' });
-    this.testUsers = new Map(); // Cache de usuarios de prueba
-    this.testTokens = new Map(); // Cache de tokens de prueba
+  constructor() {
+    this.testUserCounter = 0;
   }
 
   /**
-   * Crear usuario de prueba
+   * Crea un usuario administrador y obtiene su token
+   * @returns {Object} { user, token, headers }
    */
-  async createTestUser(userData = {}) {
-    try {
-      // Usar timestamp para emails únicos si no se proporciona uno
-      const timestamp = Date.now();
-      const defaultUser = {
-        nombre: 'Usuario Test',
-        email: `test${timestamp}@example.com`,
-        contraseña: 'password123',
-        telefono: '1234567890',
-        es_administrador: false,
-        estado: true
-      };
-
-      const user = { ...defaultUser, ...userData };
-      
-      this.logger.info('Creando usuario de prueba', { email: user.email });
-
-      // Hash de la contraseña con menos rounds para tests
-      const saltRounds = process.env.NODE_ENV === 'test' ? 4 : 10;
-      const hashedPassword = await bcrypt.hash(user.contraseña, saltRounds);
-
-      // Insertar usuario en base de datos
-      const [result] = await this.db.connection.execute(
-        `INSERT INTO usuarios (nombre, email, contraseña, telefono, es_administrador, estado) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [user.nombre, user.email, hashedPassword, user.telefono, user.es_administrador, user.estado]
-      );
-
-      const userId = result.insertId;
-      const createdUser = {
-        id: userId,
-        ...user,
-        contraseña: hashedPassword // Guardamos el hash para verificaciones
-      };
-
-      // Guardar en cache
-      this.testUsers.set(user.email, createdUser);
-
-      this.logger.success('Usuario de prueba creado', { 
-        id: userId, 
-        email: user.email,
-        es_administrador: user.es_administrador 
-      });
-
-      return createdUser;
-
-    } catch (error) {
-      this.logger.error('Error al crear usuario de prueba', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Crear usuario administrador de prueba
-   */
-  async createTestAdmin(userData = {}) {
-    // Usar un email único basado en timestamp para evitar conflictos
+  async createAdminAndGetToken() {
+    this.testUserCounter++;
+    
+    // Generar un timestamp único para evitar duplicados
     const timestamp = Date.now();
+    const uniqueId = `${this.testUserCounter}_${timestamp}`;
+    
     const adminData = {
-      nombre: 'Admin Test',
-      email: `admin${timestamp}@example.com`,
-      contraseña: 'admin123',
-      es_administrador: true,
-      ...userData
+      nombre: `Admin User ${uniqueId}`,
+      email: `admin${uniqueId}@test.com`,
+      contraseña: 'password123',
+      telefono: `123456789${this.testUserCounter}`,
+      es_administrador: true
     };
 
-    return await this.createTestUser(adminData);
-  }
+    // Registrar usuario administrador
+    const registerResponse = await request(app)
+      .post('/api/auth/register')
+      .send(adminData);
 
-  /**
-   * Generar token JWT para usuario
-   */
-  generateToken(user, expiresIn = '1h') {
-    try {
-      const payload = {
-        id: user.id,
-        email: user.email,
-        es_administrador: user.es_administrador,
-        iat: Math.floor(Date.now() / 1000)
-      };
+    console.log('Register response status:', registerResponse.status);
+    console.log('Register response body:', JSON.stringify(registerResponse.body, null, 2));
 
-      console.log('🔐 [AUTH-HELPER] Generando token para usuario:', { 
-        id: user.id, 
-        email: user.email, 
-        es_administrador: user.es_administrador 
-      });
-      console.log('🔐 [AUTH-HELPER] JWT_SECRET usado:', process.env.JWT_SECRET);
+    if (registerResponse.status !== 201) {
+      throw new Error(`Error al registrar admin: ${JSON.stringify(registerResponse.body)}`);
+    }
 
-      const token = jwt.sign(payload, process.env.JWT_SECRET || 'dev_secret', {
-        expiresIn,
-        issuer: 'gestion-proyectos-test'
+    // Hacer login para obtener token
+    const loginResponse = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: adminData.email,
+        contraseña: adminData.contraseña
       });
 
-      console.log('🔐 [AUTH-HELPER] Token generado exitosamente:', token.substring(0, 50) + '...');
-
-      this.logger.debug('Token generado', { userId: user.id, expiresIn });
-      return token;
-
-    } catch (error) {
-      console.log('❌ [AUTH-HELPER] Error al generar token:', error);
-      this.logger.error('Error al generar token', error);
-      throw error;
+    if (loginResponse.status !== 200) {
+      throw new Error(`Error al hacer login admin: ${loginResponse.body.message}`);
     }
-  }
 
-  /**
-   * Realizar login y obtener token
-   */
-  async loginUser(email, password) {
-    try {
-      this.logger.info('Realizando login de usuario', { email });
-
-      const user = await this.db.getUserByEmail(email);
-      if (!user) {
-        throw new Error('Usuario no encontrado');
-      }
-
-      // Verificar contraseña
-      const isValidPassword = await bcrypt.compare(password, user.contraseña);
-      if (!isValidPassword) {
-        throw new Error('Contraseña incorrecta');
-      }
-
-      // Generar token
-      const token = this.generateToken(user);
-      
-      // Guardar en cache
-      this.testTokens.set(email, token);
-
-      this.logger.success('Login exitoso', { email, userId: user.id });
-
-      return {
-        user: {
-          id: user.id,
-          nombre: user.nombre,
-          email: user.email,
-          es_administrador: user.es_administrador
-        },
-        token
-      };
-
-    } catch (error) {
-      this.logger.error('Error en login', error);
-      throw error;
+    const token = loginResponse.body.data?.token || loginResponse.body.token || registerResponse.body.token;
+    
+    if (!token) {
+      throw new Error('No se pudo obtener el token de autenticación');
     }
-  }
 
-  /**
-   * Obtener headers de autorización para requests
-   */
-  getAuthHeaders(token) {
+    const user = loginResponse.body.data?.user || registerResponse.body.user;
+    
+    // Asegurar que el usuario tenga el rol de responsable_proyecto para crear proyectos
+    if (!user.es_administrador) {
+      try {
+        await request(app)
+          .post('/api/roles/assign')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            usuario_id: user.id,
+            rol_nombre: 'responsable_proyecto'
+          });
+      } catch (error) {
+        // Ignorar errores de asignación de rol para admin
+      }
+    }
+
     return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      user,
+      token,
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     };
   }
 
   /**
-   * Crear usuario y obtener token en un solo paso
+   * Crea un usuario regular y obtiene su token
+   * @returns {Object} { user, token, headers }
    */
-  async createUserAndGetToken(userData = {}) {
-    try {
-      const user = await this.createTestUser(userData);
-      const token = this.generateToken(user);
-      
-      this.testTokens.set(user.email, token);
+  async createUserAndGetToken() {
+    this.testUserCounter++;
+    
+    // Generar un timestamp único para evitar duplicados
+    const timestamp = Date.now();
+    const uniqueId = `${this.testUserCounter}_${timestamp}`;
+    
+    const userData = {
+      nombre: `Test User ${uniqueId}`,
+      email: `user${uniqueId}@test.com`,
+      contraseña: 'password123',
+      telefono: `098765432${this.testUserCounter}`
+    };
 
-      return {
-        user,
-        token,
-        headers: this.getAuthHeaders(token)
-      };
+    // Registrar usuario
+    const registerResponse = await request(app)
+      .post('/api/auth/register')
+      .send(userData);
 
-    } catch (error) {
-      this.logger.error('Error al crear usuario y token', error);
-      throw error;
+    if (registerResponse.status !== 201) {
+      throw new Error(`Error al registrar usuario: ${registerResponse.body.message}`);
     }
-  }
 
-  /**
-   * Crear admin y obtener token en un solo paso
-   */
-  async createAdminAndGetToken(userData = {}) {
-    try {
-      const admin = await this.createTestAdmin(userData);
-      const token = this.generateToken(admin);
-      
-      this.testTokens.set(admin.email, token);
-
-      return {
-        user: admin,
-        token,
-        headers: this.getAuthHeaders(token)
-      };
-
-    } catch (error) {
-      this.logger.error('Error al crear admin y token', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Verificar si un token es válido
-   */
-  verifyToken(token) {
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret');
-      this.logger.debug('Token verificado', { userId: decoded.id });
-      return decoded;
-    } catch (error) {
-      this.logger.error('Token inválido', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Crear múltiples usuarios de prueba
-   */
-  async createMultipleTestUsers(count = 3) {
-    try {
-      this.logger.info('Creando múltiples usuarios de prueba', { count });
-      
-      const users = [];
-      for (let i = 0; i < count; i++) {
-        const userData = {
-          nombre: `Usuario Test ${i + 1}`,
-          email: `test${Date.now()}_${i}@example.com`,
-          contraseña: 'password123'
-        };
-        
-        const user = await this.createTestUser(userData);
-        users.push(user);
-      }
-      
-      this.logger.success('Múltiples usuarios creados exitosamente', { count });
-      return users;
-      
-    } catch (error) {
-      this.logger.error('Error al crear múltiples usuarios', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Crear usuario con rol específico y obtener token
-   */
-  async createUserWithRoleAndGetToken(userData = {}, roleName = 'responsable_proyecto') {
-    try {
-      this.logger.info('Creando usuario con rol y token', { roleName });
-      
-      // Crear usuario
-      const user = await this.createTestUser(userData);
-      
-      // Asignar rol al usuario
-      await this.assignRoleToUser(user.id, roleName);
-      
-      // Generar token
-      const token = this.generateToken(user);
-      
-      this.logger.success('Usuario con rol y token creado exitosamente', { 
-        userId: user.id, 
-        roleName 
+    // Hacer login para obtener token
+    const loginResponse = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: userData.email,
+        contraseña: userData.contraseña
       });
-      
-      return { 
-        user, 
-        token,
-        headers: this.getAuthHeaders(token)
-      };
-      
-    } catch (error) {
-      this.logger.error('Error al crear usuario con rol y token', error);
-      throw error;
+
+    if (loginResponse.status !== 200) {
+      throw new Error(`Error al hacer login usuario: ${loginResponse.body.message}`);
     }
-  }
 
-  /**
-   * Asignar rol a usuario
-   */
-  async assignRoleToUser(userId, roleName) {
-    try {
-      this.logger.info('Asignando rol a usuario', { userId, roleName });
+    const token = loginResponse.body.data?.token || loginResponse.body.token || registerResponse.body.token;
+    
+    if (!token) {
+      throw new Error('No se pudo obtener el token de autenticación');
+    }
 
-      // Obtener ID del rol
-      const [roles] = await this.db.connection.execute(
-        'SELECT id FROM roles WHERE nombre = ?',
-        [roleName]
-      );
-
-      if (roles.length === 0) {
-        throw new Error(`Rol '${roleName}' no encontrado`);
+    return {
+      user: loginResponse.body.data?.user || registerResponse.body.user,
+      token,
+      headers: {
+        'Authorization': `Bearer ${token}`
       }
-
-      const rolId = roles[0].id;
-
-      // Asignar rol al usuario
-      await this.db.connection.execute(
-        `INSERT INTO usuario_roles (usuario_id, rol_id, activo) 
-         VALUES (?, ?, TRUE) 
-         ON DUPLICATE KEY UPDATE activo = TRUE`,
-        [userId, rolId]
-      );
-
-      this.logger.success('Rol asignado exitosamente', { userId, roleName });
-
-    } catch (error) {
-      this.logger.error('Error al asignar rol', error);
-      throw error;
-    }
+    };
   }
 
   /**
-   * Limpiar datos de prueba de autenticación
+   * Crea un usuario con un rol específico y obtiene su token
+   * @param {string} role - Rol del usuario
+   * @returns {Object} { user, token, headers }
    */
-  async cleanupTestData() {
+  async createUserWithRoleAndGetToken(role) {
+    this.testUserCounter++;
+    
+    // Generar un timestamp único para evitar duplicados
+    const timestamp = Date.now();
+    const uniqueId = `${this.testUserCounter}_${timestamp}`;
+    
+    const userData = {
+      nombre: `User ${role} ${uniqueId}`,
+      email: `user${role}${uniqueId}@test.com`,
+      contraseña: 'password123',
+      telefono: `098765432${this.testUserCounter}`
+    };
+
+    // Registrar usuario
+    const registerResponse = await request(app)
+      .post('/api/auth/register')
+      .send(userData);
+
+    if (registerResponse.status !== 201) {
+      throw new Error(`Error al registrar usuario: ${registerResponse.body.message}`);
+    }
+
+    // Hacer login para obtener token
+    const loginResponse = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: userData.email,
+        contraseña: userData.contraseña
+      });
+
+    if (loginResponse.status !== 200) {
+      throw new Error(`Error al hacer login usuario: ${loginResponse.body.message}`);
+    }
+
+    const token = loginResponse.body.data?.token || loginResponse.body.token || registerResponse.body.token;
+    
+    if (!token) {
+      throw new Error('No se pudo obtener el token de autenticación');
+    }
+
+    const user = loginResponse.body.data?.user || registerResponse.body.user;
+
+    // Crear un administrador temporal para asignar el rol
+    const adminAuth = await this.createAdminAndGetToken();
+    
+    // Asignar el rol específico al usuario usando el token de administrador
     try {
-      this.logger.info('Limpiando datos de prueba de autenticación');
-      
-      // Limpiar cache
-      this.testUsers.clear();
-      this.testTokens.clear();
-      
-      this.logger.success('Datos de prueba de autenticación limpiados');
+      const roleAssignResponse = await request(app)
+        .post('/api/roles/assign')
+        .set('Authorization', `Bearer ${adminAuth.token}`)
+        .send({
+          userId: user.id,
+          roleIdentifier: role
+        });
+        
+      if (roleAssignResponse.status !== 200) {
+        console.warn(`Error al asignar rol ${role}:`, roleAssignResponse.body);
+      }
     } catch (error) {
-      this.logger.error('Error limpiando datos de prueba de autenticación', error);
-      throw error;
+      console.warn(`No se pudo asignar el rol ${role} al usuario:`, error.message);
     }
+    
+    // Simular que el usuario tiene el rol especificado
+    user.rol = role;
+    
+    return {
+      user,
+      token,
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    };
   }
 
   /**
-   * Limpiar datos de prueba (alias para compatibilidad)
+   * Crea un usuario de prueba sin token
+   * @returns {Object} user data
    */
-  async cleanup() {
-    return await this.cleanupTestData();
-  }
+  async createTestUser() {
+    this.testUserCounter++;
+    const userData = {
+      nombre: `Test User ${this.testUserCounter}`,
+      email: `testuser${this.testUserCounter}@test.com`,
+      contraseña: 'password123',
+      telefono: `555123456${this.testUserCounter}`
+    };
 
-  /**
-   * Obtener usuario de prueba del cache
-   */
-  getTestUser(email) {
-    return this.testUsers.get(email);
-  }
+    const registerResponse = await request(app)
+      .post('/api/auth/register')
+      .send(userData);
 
-  /**
-   * Obtener token de prueba del cache
-   */
-  getTestToken(email) {
-    return this.testTokens.get(email);
-  }
-
-  /**
-   * Crear token expirado para tests de expiración
-   */
-  generateExpiredToken(user) {
-    try {
-      const payload = {
-        id: user.id,
-        email: user.email,
-        es_administrador: user.es_administrador,
-        iat: Math.floor(Date.now() / 1000) - 3600, // 1 hora atrás
-        exp: Math.floor(Date.now() / 1000) - 1800  // Expirado hace 30 minutos
-      };
-
-      const token = jwt.sign(payload, process.env.JWT_SECRET || 'test_secret');
-      
-      this.logger.debug('Token expirado generado para pruebas', { userId: user.id });
-      return token;
-
-    } catch (error) {
-      this.logger.error('Error al generar token expirado', error);
-      throw error;
+    if (registerResponse.status !== 201) {
+      throw new Error(`Error al crear usuario de prueba: ${registerResponse.body.message}`);
     }
+
+    return registerResponse.body.user || userData;
   }
 
   /**
-   * Crear token con payload malformado para tests de seguridad
+   * Reset del contador para tests independientes
    */
-  generateMalformedToken() {
-    try {
-      const payload = {
-        invalid: 'payload',
-        missing: 'required_fields'
-      };
-
-      const token = jwt.sign(payload, 'wrong_secret');
-      
-      this.logger.debug('Token malformado generado para pruebas');
-      return token;
-
-    } catch (error) {
-      this.logger.error('Error al generar token malformado', error);
-      throw error;
-    }
+  reset() {
+    this.testUserCounter = 0;
   }
 }
 

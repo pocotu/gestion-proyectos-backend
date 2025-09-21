@@ -51,13 +51,15 @@ afterAll(async () => {
 });
 
 /**
- * Setup que se ejecuta antes de cada test individual
+ * Cleanup que se ejecuta antes de cada test individual
+ * Comentado para evitar eliminar usuarios creados en beforeAll
  */
 beforeEach(async () => {
   // Limpiar datos de prueba antes de cada test para aislamiento
-  if (global.testDatabase) {
-    await global.testDatabase.cleanTestData();
-  }
+  // COMENTADO: Esto elimina usuarios creados en beforeAll
+  // if (global.testDatabase) {
+  //   await global.testDatabase.cleanTestData();
+  // }
 });
 
 /**

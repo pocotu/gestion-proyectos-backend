@@ -52,7 +52,10 @@ class ProjectController {
 
       res.json({
         success: true,
-        data: result
+        projects: result.projects,
+        data: {
+          pagination: result.pagination
+        }
       });
 
     } catch (error) {
@@ -102,17 +105,20 @@ class ProjectController {
         creado_por
       };
 
-      const project = await this.projectService.createProject(projectData, creado_por);
+      const createdProject = await this.projectService.createProject(projectData, creado_por);
 
       // Si el usuario no es admin, asignarlo como responsable del proyecto
       if (!req.user.es_administrador) {
-        await this.projectService.assignResponsible(project.id, creado_por, creado_por);
+        await this.projectService.assignResponsible(createdProject.id, creado_por, creado_por);
       }
+
+      // Obtener el proyecto completo con todos sus campos
+      const project = await this.projectService.getProjectById(createdProject.id);
 
       res.status(201).json({
         success: true,
         message: 'Proyecto creado exitosamente',
-        data: { project }
+        project: project
       });
 
     } catch (error) {
@@ -165,7 +171,7 @@ class ProjectController {
 
       res.json({
         success: true,
-        data: { project }
+        project: project
       });
 
     } catch (error) {
@@ -264,7 +270,7 @@ class ProjectController {
       res.json({
         success: true,
         message: 'Proyecto actualizado exitosamente',
-        data: { project: updatedProject }
+        project: updatedProject
       });
 
     } catch (error) {
@@ -359,7 +365,7 @@ class ProjectController {
       res.json({
         success: true,
         message: 'Estado del proyecto actualizado exitosamente',
-        data: { project: updatedProject }
+        project: updatedProject
       });
 
     } catch (error) {
@@ -755,13 +761,26 @@ class ProjectController {
    */
   async searchProjects(req, res) {
     try {
+      console.log('🔍 [SEARCH-CONTROLLER] Iniciando búsqueda de proyectos');
+      console.log('🔍 [SEARCH-CONTROLLER] Query params:', req.query);
+      console.log('🔍 [SEARCH-CONTROLLER] Usuario:', req.user);
+      
       const { q: query, limit = 10, offset = 0, page = 1 } = req.query;
       
       // Si no hay query, buscar todos los proyectos
       const searchQuery = query ? query.trim() : '';
+      console.log('🔍 [SEARCH-CONTROLLER] Search query:', searchQuery);
 
       const userId = req.user.id;
       const isAdmin = req.user.es_administrador || false;
+      
+      console.log('🔍 [SEARCH-CONTROLLER] Parámetros de búsqueda:', {
+        searchQuery,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        userId,
+        isAdmin
+      });
       
       const result = await this.projectService.searchProjects(searchQuery, {
         page: parseInt(page),
@@ -770,16 +789,19 @@ class ProjectController {
         isAdmin
       });
 
+      console.log('🔍 [SEARCH-CONTROLLER] Resultado:', result);
+
       res.json({
         success: true,
         data: result
       });
 
     } catch (error) {
-      console.error('Error buscando proyectos:', error);
+      console.error('❌ [SEARCH-CONTROLLER] Error buscando proyectos:', error);
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor'
+        message: 'Error interno del servidor',
+        error: error.message
       });
     }
   }

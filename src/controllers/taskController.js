@@ -142,11 +142,7 @@ class TaskController {
         success: true,
         message: 'Tarea creada exitosamente',
         data: { 
-          task: {
-            id: result.insertId || result.id,
-            ...taskData,
-            creado_por
-          }
+          task: result
         }
       });
 

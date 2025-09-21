@@ -23,7 +23,7 @@ const fileController = new FileController();
  */
 
 // Middleware para todas las rutas de archivos
-router.use(authenticate());
+router.use(authenticate);
 router.use(attachPermissions());
 
 /**

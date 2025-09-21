@@ -38,7 +38,7 @@ class ProjectResponsibleModel {
   }
 
   static async removeResponsible(proyecto_id, usuario_id, rol_responsabilidad = null) {
-    let sql = `UPDATE proyecto_responsables SET activo = FALSE WHERE proyecto_id = ? AND usuario_id = ?`;
+    let sql = `UPDATE proyecto_responsables SET activo = 0 WHERE proyecto_id = ? AND usuario_id = ?`;
     let params = [proyecto_id, usuario_id];
     
     if (rol_responsabilidad) {
@@ -57,7 +57,7 @@ class ProjectResponsibleModel {
       FROM proyecto_responsables pr
       JOIN usuarios u ON pr.usuario_id = u.id
       LEFT JOIN usuarios asignador ON pr.asignado_por = asignador.id
-      WHERE pr.proyecto_id = ? AND pr.activo = TRUE
+      WHERE pr.proyecto_id = ? AND pr.activo = 1
       ORDER BY 
         CASE pr.rol_responsabilidad 
           WHEN 'responsable_principal' THEN 1
@@ -77,7 +77,7 @@ class ProjectResponsibleModel {
              p.fecha_inicio, p.fecha_fin
       FROM proyecto_responsables pr
       JOIN proyectos p ON pr.proyecto_id = p.id
-      WHERE pr.usuario_id = ? AND pr.activo = TRUE
+      WHERE pr.usuario_id = ? AND pr.activo = 1
       ORDER BY 
         CASE pr.rol_responsabilidad 
           WHEN 'responsable_principal' THEN 1
@@ -96,7 +96,7 @@ class ProjectResponsibleModel {
       SELECT pr.*, u.nombre, u.email
       FROM proyecto_responsables pr
       JOIN usuarios u ON pr.usuario_id = u.id
-      WHERE pr.proyecto_id = ? AND pr.rol_responsabilidad = ? AND pr.activo = TRUE
+      WHERE pr.proyecto_id = ? AND pr.rol_responsabilidad = ? AND pr.activo = 1
       ORDER BY pr.fecha_asignacion ASC
     `;
     const [rows] = await pool.execute(sql, [proyecto_id, rol_responsabilidad]);
@@ -108,7 +108,7 @@ class ProjectResponsibleModel {
       SELECT pr.*, u.nombre, u.email
       FROM proyecto_responsables pr
       JOIN usuarios u ON pr.usuario_id = u.id
-      WHERE pr.proyecto_id = ? AND pr.rol_responsabilidad = 'responsable_principal' AND pr.activo = TRUE
+      WHERE pr.proyecto_id = ? AND pr.rol_responsabilidad = 'responsable_principal' AND pr.activo = 1
       LIMIT 1
     `;
     const [rows] = await pool.execute(sql, [proyecto_id]);
@@ -119,7 +119,7 @@ class ProjectResponsibleModel {
     let sql = `
       SELECT COUNT(*) as count
       FROM proyecto_responsables
-      WHERE proyecto_id = ? AND usuario_id = ? AND activo = TRUE
+      WHERE proyecto_id = ? AND usuario_id = ? AND activo = 1
     `;
     let params = [proyecto_id, usuario_id];
     
@@ -136,7 +136,7 @@ class ProjectResponsibleModel {
     const sql = `
       UPDATE proyecto_responsables 
       SET rol_responsabilidad = ?, asignado_por = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE proyecto_id = ? AND usuario_id = ? AND activo = TRUE
+      WHERE proyecto_id = ? AND usuario_id = ? AND activo = 1
     `;
     const [result] = await pool.execute(sql, [nuevo_rol, asignado_por, proyecto_id, usuario_id]);
     return result.affectedRows > 0;

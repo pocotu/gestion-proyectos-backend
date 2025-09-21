@@ -44,11 +44,7 @@ class AuthController {
       });
 
       console.log('🎯 [AUTH-CONTROLLER] register - Usuario creado exitosamente');
-      res.status(201).json({
-        success: true,
-        message: 'Usuario registrado exitosamente',
-        data: user
-      });
+      res.status(201).json(user);
       console.log('🎯 [AUTH-CONTROLLER] register - Respuesta enviada');
 
     } catch (error) {

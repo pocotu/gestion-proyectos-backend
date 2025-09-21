@@ -19,7 +19,7 @@ const authController = new AuthController();
  */
 
 // Middleware para todas las rutas de usuarios
-router.use(authenticate());
+router.use(authenticate);
 router.use(attachPermissions());
 
 /**

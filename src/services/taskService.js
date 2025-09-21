@@ -108,12 +108,15 @@ class TaskService {
         }
       }
 
-      const newTask = await this.taskRepository.createTask({
+      const result = await this.taskRepository.createTask({
         ...taskData,
         creado_por: createdBy,
         estado: 'pendiente'
       });
 
+      // Obtener la tarea completa recién creada
+      const newTask = await this.taskRepository.findById(result.id);
+      
       return newTask;
     } catch (error) {
       console.error('Error en TaskService.createTask:', error);

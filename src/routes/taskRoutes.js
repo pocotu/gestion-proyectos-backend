@@ -18,7 +18,7 @@ const taskController = new TaskController();
  */
 
 // Middleware para todas las rutas de tareas
-router.use(authenticate());
+router.use(authenticate);
 router.use(attachPermissions());
 
 /**

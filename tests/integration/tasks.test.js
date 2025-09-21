@@ -1,115 +1,395 @@
 /**
- * Tests de Integración - Tareas
- * Valida todos los endpoints de tareas requeridos por el frontend
- * Siguiendo principios SOLID y mejores prácticas de testing
+ * Tests de Integración - Tareas MVP
+ * Valida endpoints básicos de tareas para MVP
+ * Simplificado sin funcionalidades complejas como subtareas
  */
 
 const request = require('supertest');
 const app = require('../../src/app');
 const DatabaseHelper = require('../utils/DatabaseHelper');
-const AuthHelper = require('../utils/AuthHelper');
 const TestLogger = require('../utils/TestLogger');
-const { getTestConfig } = require('../utils/TestConfig');
+const AuthHelper = require('../utils/AuthHelper');
 
-// Endpoints
-const tasksEndpoint = '/api/tasks';
-
-describe('Tasks Integration Tests', () => {
+describe('Tasks Integration Tests - MVP', () => {
   let db;
-  let authHelper;
   let logger;
-  let config;
+  let authHelper;
+  let adminToken;
+  let userToken;
+  let adminUser;
+  let regularUser;
+  let testProject;
 
   // Setup global para todos los tests
   beforeAll(async () => {
     logger = new TestLogger({ prefix: '[TASKS-TESTS]' });
-    config = getTestConfig();
+    authHelper = new AuthHelper();
     
-    logger.testStart('Configurando entorno de tests de tareas');
+    logger.testStart('Configurando entorno de tests de tareas MVP');
     
-    // Inicializar helpers
+    // Inicializar helper de base de datos
     db = new DatabaseHelper();
     await db.initialize();
     
-    authHelper = new AuthHelper(app, db);
+    // Crear usuarios de prueba
+    const adminData = {
+      nombre: 'Admin User',
+      email: 'admin@test.com',
+      contraseña: 'password123',
+      telefono: '1234567890',
+      es_administrador: true
+    };
+
+    const userData = {
+      nombre: 'Regular User',
+      email: 'user@test.com',
+      contraseña: 'password123',
+      telefono: '0987654321'
+    };
+
+    // Registrar usuarios
+    const adminResponse = await request(app)
+      .post('/api/auth/register')
+      .send(adminData);
+    
+    const userResponse = await request(app)
+      .post('/api/auth/register')
+      .send(userData);
+
+    adminToken = adminResponse.body.data?.token || adminResponse.body.token;
+    userToken = userResponse.body.data?.token || userResponse.body.token;
+    adminUser = adminResponse.body.user;
+    regularUser = userResponse.body.user;
+
+    // Crear proyecto de prueba
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        titulo: 'Proyecto de Prueba',
+        descripcion: 'Proyecto para tests de tareas',
+        fecha_inicio: '2024-01-01',
+        fecha_fin: '2024-12-31'
+      });
+    
+    testProject = projectResponse.body.project;
     
     logger.success('Entorno de tests configurado exitosamente');
   }, 30000);
 
   // Cleanup después de cada test
   afterEach(async () => {
-    await db.cleanTestData();
-    await authHelper.cleanup();
+    // Solo limpiar tareas, no usuarios ni proyectos principales
+    if (db && db.connection) {
+      try {
+        await db.connection.execute('SET FOREIGN_KEY_CHECKS = 0');
+        await db.connection.execute('DELETE FROM tareas WHERE proyecto_id = ?', [testProject.id]);
+        await db.connection.execute('SET FOREIGN_KEY_CHECKS = 1');
+      } catch (error) {
+        console.error('Error limpiando datos de test:', error.message);
+      }
+    }
   });
 
   // Cleanup global
   afterAll(async () => {
     logger.testEnd('Finalizando tests de tareas');
-    try {
-      await db.cleanup();
-      await db.close();
-    } catch (error) {
-      logger.error('Error en cleanup final', error);
-    }
-  }, 30000);
+    await db.close();
+  });
+
+  // Helper para crear tarea de prueba
+  const createTestTask = async (taskData, token) => {
+    const response = await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${token}`)
+      .send(taskData);
+    // El controlador devuelve response.body.data.task, pero el test exitoso espera response.body.task
+    // Verificamos ambas estructuras para compatibilidad
+    return response.body.data?.task || response.body.task;
+  };
+
+  describe('POST /api/tasks', () => {
+    test('Debe crear una tarea exitosamente', async () => {
+      logger.info('Test: Crear tarea');
+      
+      const taskData = {
+        titulo: 'Tarea de Prueba',
+        descripcion: 'Descripción de la tarea de prueba',
+        proyecto_id: testProject.id,
+        usuario_asignado_id: regularUser.id,
+        fecha_inicio: '2024-06-01',
+        fecha_fin: '2024-06-30',
+        prioridad: 'media'
+      };
+      
+      const response = await request(app)
+        .post('/api/tasks')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(taskData)
+        .expect(201);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        data: {
+          task: {
+            id: expect.any(Number),
+            titulo: taskData.titulo,
+            descripcion: taskData.descripcion,
+            proyecto_id: taskData.proyecto_id,
+            usuario_asignado_id: taskData.usuario_asignado_id,
+            estado: 'pendiente',
+            prioridad: taskData.prioridad
+          }
+        }
+      });
+      
+      logger.success('Tarea creada correctamente');
+    });
+
+    test('Debe fallar al crear tarea sin autorización', async () => {
+      const taskData = {
+        titulo: 'Tarea Sin Auth',
+        descripcion: 'Descripción',
+        proyecto_id: testProject.id,
+        usuario_asignado_id: regularUser.id,
+        fecha_vencimiento: '2024-06-30'
+      };
+      
+      const response = await request(app)
+        .post('/api/tasks')
+        .send(taskData)
+        .expect(401);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('Token de acceso requerido');
+      
+      logger.success('Validación de autorización funcionando');
+    });
+  });
 
   describe('GET /api/tasks', () => {
-    test('Debe listar tareas como admin', async () => {
+    test('Debe listar tareas como administrador', async () => {
       logger.info('Test: Listar tareas como admin');
       
-      const { headers: adminHeaders, user: adminUser } = await authHelper.createAdminAndGetToken();
-      
-      // Crear proyecto y tareas de prueba
-      const project = await createTestProject(adminUser.id);
-      await createTestTasks(3, project.id, adminUser.id);
+      // Crear algunas tareas de prueba
+      await createTestTask({
+        titulo: 'Tarea 1',
+        descripcion: 'Descripción 1',
+        proyecto_id: testProject.id,
+        usuario_asignado_id: regularUser.id,
+        fecha_inicio: '2024-06-01',
+        fecha_fin: '2024-06-30',
+        prioridad: 'alta'
+      }, adminToken);
+
+      await createTestTask({
+        titulo: 'Tarea 2',
+        descripcion: 'Descripción 2',
+        proyecto_id: testProject.id,
+        usuario_asignado_id: adminUser.id,
+        fecha_inicio: '2024-07-01',
+        fecha_fin: '2024-07-31',
+        prioridad: 'baja'
+      }, adminToken);
 
       const response = await request(app)
         .get('/api/tasks')
-        .set(adminHeaders)
+        .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
         success: true,
         data: {
-          tasks: expect.any(Array)
+          tasks: expect.any(Array),
+          pagination: expect.any(Object)
         }
       });
+
+      expect(response.body.data.tasks.length).toBeGreaterThanOrEqual(2);
       
       logger.success('Tareas listadas correctamente');
     });
 
-    test('Debe listar solo tareas accesibles para usuario regular', async () => {
+    test('Debe listar tareas asignadas para usuario regular', async () => {
       logger.info('Test: Listar tareas como usuario regular');
       
-      const { user, headers } = await authHelper.createUserWithRoleAndGetToken('responsable_tarea');
-      
-      // Crear proyecto y tarea asignada al usuario
-      const project = await createTestProject();
+      // Crear tarea asignada al usuario regular
       await createTestTask({
-        ...getTestTaskData(),
-        proyecto_id: project.id,
-        usuario_asignado_id: user.id
-      });
+        titulo: 'Mi Tarea',
+        descripcion: 'Tarea asignada a mí',
+        proyecto_id: testProject.id,
+        usuario_asignado_id: regularUser.id,
+        fecha_vencimiento: '2024-06-30'
+      }, adminToken);
 
       const response = await request(app)
-        .get(tasksEndpoint)
-        .set(headers)
+        .get('/api/tasks')
+        .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
 
       expect(response.body).toMatchObject({
         success: true,
-        data: {
-          tasks: expect.any(Array)
+        tasks: expect.any(Array)
+      });
+      
+      logger.success('Filtrado de tareas por usuario funcionando');
+    });
+  });
+
+  describe('GET /api/tasks/:id', () => {
+    test('Debe obtener detalles de una tarea específica', async () => {
+      logger.info('Test: Obtener detalles de tarea');
+      
+      const task = await createTestTask({
+        titulo: 'Tarea Detalle',
+        descripcion: 'Descripción detallada',
+        proyecto_id: testProject.id,
+        usuario_asignado_id: regularUser.id,
+        fecha_vencimiento: '2024-06-30',
+        prioridad: 'alta'
+      }, adminToken);
+
+      const response = await request(app)
+        .get(`/api/tasks/${task.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        task: {
+          id: task.id,
+          titulo: 'Tarea Detalle',
+          descripcion: 'Descripción detallada',
+          estado: 'pendiente',
+          prioridad: 'alta'
         }
       });
       
-      logger.success('Filtrado de tareas por permisos funcionando');
+      logger.success('Detalles de tarea obtenidos correctamente');
     });
 
+    test('Debe fallar al obtener tarea inexistente', async () => {
+      const response = await request(app)
+        .get('/api/tasks/99999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('no encontrada');
+      
+      logger.success('Validación de tarea inexistente funcionando');
+    });
+  });
+
+  describe('PUT /api/tasks/:id', () => {
+    test('Debe actualizar una tarea exitosamente', async () => {
+      logger.info('Test: Actualizar tarea');
+      
+      const task = await createTestTask({
+        titulo: 'Tarea Original',
+        descripcion: 'Descripción original',
+        proyecto_id: testProject.id,
+        usuario_asignado_id: regularUser.id,
+        fecha_vencimiento: '2024-06-30',
+        prioridad: 'baja'
+      }, adminToken);
+
+      const updateData = {
+        titulo: 'Tarea Actualizada',
+        descripcion: 'Descripción actualizada',
+        estado: 'en_progreso',
+        prioridad: 'alta'
+      };
+
+      const response = await request(app)
+        .put(`/api/tasks/${task.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        task: {
+          id: task.id,
+          titulo: updateData.titulo,
+          descripcion: updateData.descripcion,
+          estado: updateData.estado,
+          prioridad: updateData.prioridad
+        }
+      });
+      
+      logger.success('Tarea actualizada correctamente');
+    });
+  });
+
+  describe('PATCH /api/tasks/:id/status', () => {
+    test('Debe actualizar el estado de una tarea', async () => {
+      logger.info('Test: Actualizar estado de tarea');
+      
+      const task = await createTestTask({
+        titulo: 'Tarea Estado',
+        descripcion: 'Tarea para cambiar estado',
+        proyecto_id: testProject.id,
+        usuario_asignado_id: regularUser.id,
+        fecha_vencimiento: '2024-06-30'
+      }, adminToken);
+
+      const response = await request(app)
+        .patch(`/api/tasks/${task.id}/status`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ estado: 'completada' })
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        task: {
+          id: task.id,
+          estado: 'completada'
+        }
+      });
+      
+      logger.success('Estado de tarea actualizado correctamente');
+    });
+  });
+
+  describe('DELETE /api/tasks/:id', () => {
+    test('Debe eliminar una tarea exitosamente', async () => {
+      logger.info('Test: Eliminar tarea');
+      
+      const task = await createTestTask({
+        titulo: 'Tarea a Eliminar',
+        descripcion: 'Esta tarea será eliminada',
+        proyecto_id: testProject.id,
+        usuario_asignado_id: regularUser.id,
+        fecha_vencimiento: '2024-06-30'
+      }, adminToken);
+
+      const response = await request(app)
+        .delete(`/api/tasks/${task.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        message: expect.stringContaining('eliminada')
+      });
+      
+      // Verificar que la tarea ya no existe
+      await request(app)
+        .get(`/api/tasks/${task.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+      
+      logger.success('Tarea eliminada correctamente');
+    });
+  });
+
+  describe('Filtros y Paginación', () => {
     test('Debe soportar paginación', async () => {
       logger.info('Test: Paginación de tareas');
       
       const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();
+      const tasksEndpoint = '/api/tasks';
       
       // Crear proyecto y varias tareas
       const project = await createTestProject();
@@ -134,6 +414,7 @@ describe('Tasks Integration Tests', () => {
       logger.info('Test: Filtros por estado');
       
       const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();
+      const tasksEndpoint = '/api/tasks';
       
       // Crear proyecto y tarea con estado específico
       const project = await createTestProject();
@@ -157,6 +438,7 @@ describe('Tasks Integration Tests', () => {
       logger.info('Test: Filtros por prioridad');
       
       const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();
+      const tasksEndpoint = '/api/tasks';
       
       // Crear proyecto y tarea con prioridad específica
       const project = await createTestProject();
@@ -180,6 +462,7 @@ describe('Tasks Integration Tests', () => {
       logger.info('Test: Filtros por proyecto');
       
       const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();
+      const tasksEndpoint = '/api/tasks';
       
       // Crear proyecto y tarea
       const project = await createTestProject();
@@ -804,19 +1087,7 @@ describe('Tasks Integration Tests', () => {
     });
   });
 
-  // Funciones auxiliares para tests
-  function getTestTaskData() {
-    const now = new Date();
-    const futureDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 días después
 
-    return {
-      titulo: 'Tarea Test',
-      descripcion: 'Descripción de la tarea de prueba',
-      fecha_inicio: now.toISOString().split('T')[0],
-      fecha_fin: futureDate.toISOString().split('T')[0],
-      prioridad: 'media'
-    };
-  }
 
   async function createTestProject(createdBy = null) {
     // Si no se proporciona createdBy, crear un usuario admin primero
@@ -846,47 +1117,17 @@ describe('Tasks Integration Tests', () => {
     return project;
   }
 
-  async function createTestTask(taskData) {
-    // Asegurar que tenemos un usuario válido para creado_por
-    let createdBy = taskData.creado_por;
-    if (!createdBy) {
-      // Crear un usuario de prueba si no se proporciona
-      const testUser = await authHelper.createTestUser();
-      createdBy = testUser.id;
-    }
-
-    // Verificar que el usuario existe antes de crear la tarea
-    const [userExists] = await db.connection.execute(
-      'SELECT id FROM usuarios WHERE id = ?',
-      [createdBy]
-    );
-
-    if (userExists.length === 0) {
-      throw new Error(`Usuario con ID ${createdBy} no existe`);
-    }
-
-    const query = `
-      INSERT INTO tareas (titulo, descripcion, fecha_inicio, fecha_fin, prioridad, proyecto_id, usuario_asignado_id, estado, creado_por)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    
-    const result = await db.query(query, [
-      taskData.titulo,
-      taskData.descripcion,
-      taskData.fecha_inicio,
-      taskData.fecha_fin,
-      taskData.prioridad || 'media',
-      taskData.proyecto_id,
-      taskData.usuario_asignado_id || null,
-      taskData.estado || 'pendiente',
-      createdBy
-    ]);
+  // Helper functions
+  function getTestTaskData() {
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 días después
 
     return {
-      id: result.insertId,
-      ...taskData,
-      creado_por: createdBy,
-      estado: taskData.estado || 'pendiente'
+      titulo: 'Tarea Test',
+      descripcion: 'Descripción de la tarea de prueba',
+      fecha_inicio: now.toISOString().split('T')[0],
+      fecha_fin: futureDate.toISOString().split('T')[0],
+      prioridad: 'media'
     };
   }
 
@@ -900,6 +1141,9 @@ describe('Tasks Integration Tests', () => {
       validCreatedBy = testUser.id;
     }
     
+    // Obtener token de admin para crear las tareas
+    const { token } = await authHelper.createAdminAndGetToken();
+    
     for (let i = 0; i < count; i++) {
       const taskData = {
         ...getTestTaskData(),
@@ -907,7 +1151,7 @@ describe('Tasks Integration Tests', () => {
         proyecto_id: projectId,
         creado_por: validCreatedBy
       };
-      const task = await createTestTask(taskData);
+      const task = await createTestTask(taskData, token);
       tasks.push(task);
     }
     return tasks;

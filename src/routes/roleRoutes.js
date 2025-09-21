@@ -21,7 +21,7 @@ const roleController = new RoleController();
  * GET /api/roles/my-roles
  */
 router.get('/my-roles', 
-  authenticate(), 
+  authenticate, 
   roleController.getMyRoles.bind(roleController)
 );
 
@@ -30,7 +30,7 @@ router.get('/my-roles',
  * GET /api/roles/my-roles/has-role?roleIdentifier=admin
  */
 router.get('/my-roles/has-role', 
-  authenticate(), 
+  authenticate, 
   roleController.checkMyRole.bind(roleController)
 );
 
@@ -44,7 +44,7 @@ router.get('/my-roles/has-role',
  * Acceso: admin, responsable_proyecto
  */
 router.get('/', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin', 'responsable_proyecto']),
   roleController.getAllRoles.bind(roleController)
 );
@@ -55,7 +55,7 @@ router.get('/',
  * Acceso: admin, responsable_proyecto (solo pueden ver roles de usuarios bajo su responsabilidad)
  */
 router.get('/user/:userId', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin', 'responsable_proyecto']),
   roleController.getUserRoles.bind(roleController)
 );
@@ -66,7 +66,7 @@ router.get('/user/:userId',
  * Acceso: admin, responsable_proyecto
  */
 router.get('/user/:userId/has-role', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin', 'responsable_proyecto']),
   roleController.userHasRole.bind(roleController)
 );
@@ -78,7 +78,7 @@ router.get('/user/:userId/has-role',
  * Acceso: admin, responsable_proyecto
  */
 router.post('/user/:userId/has-any-role', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin', 'responsable_proyecto']),
   roleController.userHasAnyRole.bind(roleController)
 );
@@ -89,7 +89,7 @@ router.post('/user/:userId/has-any-role',
  * Acceso: admin, responsable_proyecto
  */
 router.get('/:roleIdentifier/users', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin', 'responsable_proyecto']),
   roleController.getUsersByRole.bind(roleController)
 );
@@ -100,7 +100,7 @@ router.get('/:roleIdentifier/users',
  * Acceso: solo admin
  */
 router.get('/statistics', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin']),
   roleController.getRoleStatistics.bind(roleController)
 );
@@ -116,7 +116,7 @@ router.get('/statistics',
  * Acceso: solo admin
  */
 router.post('/', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin']),
   roleController.createRole.bind(roleController)
 );
@@ -128,7 +128,7 @@ router.post('/',
  * Acceso: admin o responsable_proyecto (con limitaciones)
  */
 router.post('/assign', 
-  authenticate(),
+  authenticate,
   requireAdminOrRoles(['responsable_proyecto']),
   AuditMiddleware.auditRoleAssignment(),
   roleController.assignRole.bind(roleController)
@@ -141,7 +141,7 @@ router.post('/assign',
  * Acceso: admin o responsable_proyecto (con limitaciones)
  */
 router.delete('/remove', 
-  authenticate(),
+  authenticate,
   requireAdminOrRoles(['responsable_proyecto']),
   AuditMiddleware.auditRoleRemoval(),
   roleController.removeRole.bind(roleController)
@@ -154,7 +154,7 @@ router.delete('/remove',
  * Acceso: solo admin
  */
 router.post('/assign-multiple', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin']),
   AuditMiddleware.auditRoleAssignment(),
   roleController.assignMultipleRoles.bind(roleController)
@@ -167,7 +167,7 @@ router.post('/assign-multiple',
  * Acceso: solo admin
  */
 router.delete('/remove-multiple', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin']),
   AuditMiddleware.auditRoleRemoval(),
   roleController.removeMultipleRoles.bind(roleController)
@@ -180,7 +180,7 @@ router.delete('/remove-multiple',
  * Acceso: solo admin
  */
 router.put('/sync', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin']),
   AuditMiddleware.auditRoleSync(),
   roleController.syncUserRoles.bind(roleController)

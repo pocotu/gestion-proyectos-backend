@@ -90,7 +90,7 @@ class ProjectRepository extends BaseRepository {
   }
 
   /**
-   * Buscar proyectos con filtros avanzados
+   * Buscar proyectos con filtros avanzados - MVP simplificado
    */
   async search(query = '', { limit = 10, offset = 0, userId = null, isAdmin = false } = {}) {
     let sql = `
@@ -107,22 +107,10 @@ class ProjectRepository extends BaseRepository {
       params.push(`%${query}%`, `%${query}%`);
     }
     
-    // Si no es admin, filtrar por acceso del usuario
+    // En MVP simplificado: Si no es admin, solo ve proyectos que creó
     if (!isAdmin && userId) {
-      whereConditions.push(`(
-        EXISTS (
-          SELECT 1 FROM proyecto_responsables pr 
-          WHERE pr.proyecto_id = p.id 
-          AND pr.usuario_id = ? 
-          AND pr.activo = true
-        ) 
-        OR EXISTS (
-          SELECT 1 FROM tareas t 
-          WHERE t.proyecto_id = p.id 
-          AND t.asignado_a = ?
-        )
-      )`);
-      params.push(userId, userId);
+      whereConditions.push('p.creado_por = ?');
+      params.push(userId);
     }
     
     if (whereConditions.length > 0) {
@@ -136,7 +124,7 @@ class ProjectRepository extends BaseRepository {
   }
 
   /**
-   * Contar resultados de búsqueda
+   * Contar resultados de búsqueda - MVP simplificado
    */
   async countSearch(query = '', userId = null, isAdmin = false) {
     let sql = `
@@ -153,22 +141,10 @@ class ProjectRepository extends BaseRepository {
       params.push(`%${query}%`, `%${query}%`);
     }
     
-    // Si no es admin, filtrar por acceso del usuario
+    // En MVP simplificado: Si no es admin, solo ve proyectos que creó
     if (!isAdmin && userId) {
-      whereConditions.push(`(
-        EXISTS (
-          SELECT 1 FROM proyecto_responsables pr 
-          WHERE pr.proyecto_id = p.id 
-          AND pr.usuario_id = ? 
-          AND pr.activo = true
-        ) 
-        OR EXISTS (
-          SELECT 1 FROM tareas t 
-          WHERE t.proyecto_id = p.id 
-          AND t.asignado_a = ?
-        )
-      )`);
-      params.push(userId, userId);
+      whereConditions.push('p.creado_por = ?');
+      params.push(userId);
     }
     
     if (whereConditions.length > 0) {
@@ -417,7 +393,7 @@ class ProjectRepository extends BaseRepository {
       SELECT p.*, 
              GROUP_CONCAT(CONCAT(u.nombre, ' (', pr.rol_responsabilidad, ')') SEPARATOR ', ') as responsables
       FROM proyectos p
-      LEFT JOIN proyecto_responsables pr ON p.id = pr.proyecto_id AND pr.activo = TRUE
+      LEFT JOIN proyecto_responsables pr ON p.id = pr.proyecto_id AND pr.activo = 1
       LEFT JOIN usuarios u ON pr.usuario_id = u.id
       ${projectId ? 'WHERE p.id = ?' : ''}
       GROUP BY p.id
@@ -572,7 +548,7 @@ class ProjectRepository extends BaseRepository {
     return await this.raw(`
       SELECT p.*
       FROM proyectos p
-      LEFT JOIN proyecto_responsables pr ON p.id = pr.proyecto_id AND pr.activo = TRUE
+      LEFT JOIN proyecto_responsables pr ON p.id = pr.proyecto_id AND pr.activo = 1
       WHERE pr.proyecto_id IS NULL
       ORDER BY p.created_at DESC
     `);

@@ -87,21 +87,28 @@ class ProjectResponsibleRepository extends BaseRepository {
    * Obtiene todos los responsables activos de un proyecto
    */
   async getProjectResponsibles(proyecto_id) {
-    // Usar consulta SQL directa para evitar problemas con el query builder
+    // Usar consulta SQL directa adaptada a la estructura MVP simplificada
     const query = `
       SELECT 
         pr.*, 
         u.nombre as usuario_nombre, 
-        u.email, 
+        u.email,
         asignador.nombre as asignado_por_nombre
       FROM proyecto_responsables pr
       INNER JOIN usuarios u ON pr.usuario_id = u.id
       LEFT JOIN usuarios asignador ON pr.asignado_por = asignador.id
-      WHERE pr.proyecto_id = ? AND pr.activo = ?
-      ORDER BY pr.rol_responsabilidad ASC
+      WHERE pr.proyecto_id = ? AND pr.activo = 1
+      ORDER BY 
+        CASE pr.rol_responsabilidad 
+          WHEN 'responsable_principal' THEN 1
+          WHEN 'responsable_secundario' THEN 2
+          WHEN 'supervisor' THEN 3
+          WHEN 'colaborador' THEN 4
+        END,
+        pr.created_at ASC
     `;
     
-    const [rows] = await pool.execute(query, [proyecto_id, true]);
+    const [rows] = await pool.execute(query, [proyecto_id]);
     return rows;
   }
 
@@ -127,14 +134,16 @@ class ProjectResponsibleRepository extends BaseRepository {
       throw new Error('Rol de responsabilidad inválido');
     }
 
-    return await this
-      .select('proyecto_responsables.*, usuarios.nombre as usuario_nombre, usuarios.email')
-      .join('usuarios', 'proyecto_responsables.usuario_id', 'usuarios.id')
-      .where('proyecto_responsables.proyecto_id', proyecto_id)
-      .where('proyecto_responsables.rol_responsabilidad', rol_responsabilidad)
-      .where('proyecto_responsables.activo', true)
-      .orderBy('usuarios.nombre', 'ASC')
-      .get();
+    const query = `
+      SELECT pr.*, u.nombre as usuario_nombre, u.email
+      FROM proyecto_responsables pr
+      INNER JOIN usuarios u ON pr.usuario_id = u.id
+      WHERE pr.proyecto_id = ? AND pr.rol_responsabilidad = ? AND pr.activo = 1
+      ORDER BY u.nombre ASC
+    `;
+    
+    const [rows] = await pool.execute(query, [proyecto_id, rol_responsabilidad]);
+    return rows;
   }
 
   /**
@@ -154,16 +163,20 @@ class ProjectResponsibleRepository extends BaseRepository {
    * Verifica si un usuario es responsable de un proyecto
    */
   async isUserResponsible(proyecto_id, usuario_id, rol_responsabilidad = null) {
-    let query = this
-      .where('proyecto_id', proyecto_id)
-      .where('usuario_id', usuario_id)
-      .where('activo', true);
+    let query = `
+      SELECT COUNT(*) as count
+      FROM proyecto_responsables
+      WHERE proyecto_id = ? AND usuario_id = ? AND activo = 1
+    `;
+    let params = [proyecto_id, usuario_id];
 
     if (rol_responsabilidad) {
-      query = query.where('rol_responsabilidad', rol_responsabilidad);
+      query += ` AND rol_responsabilidad = ?`;
+      params.push(rol_responsabilidad);
     }
 
-    return await query.exists();
+    const [rows] = await pool.execute(query, params);
+    return rows[0].count > 0;
   }
 
   /**
@@ -304,14 +317,16 @@ class ProjectResponsibleRepository extends BaseRepository {
    * Busca proyectos por responsable y rol
    */
   async findProjectsByResponsibleAndRole(usuario_id, rol_responsabilidad) {
-    return await this
-      .select('proyecto_responsables.*, proyectos.titulo, proyectos.descripcion, proyectos.estado')
-      .join('proyectos', 'proyecto_responsables.proyecto_id', 'proyectos.id')
-      .where('proyecto_responsables.usuario_id', usuario_id)
-      .where('proyecto_responsables.rol_responsabilidad', rol_responsabilidad)
-      .where('proyecto_responsables.activo', true)
-      .orderBy('proyectos.created_at', 'DESC')
-      .get();
+    const query = `
+      SELECT pr.*, p.titulo, p.descripcion, p.estado
+      FROM proyecto_responsables pr
+      INNER JOIN proyectos p ON pr.proyecto_id = p.id
+      WHERE pr.usuario_id = ? AND pr.rol_responsabilidad = ? AND pr.activo = 1
+      ORDER BY p.created_at DESC
+    `;
+    
+    const [rows] = await pool.execute(query, [usuario_id, rol_responsabilidad]);
+    return rows;
   }
 
   /**

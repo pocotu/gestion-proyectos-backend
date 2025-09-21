@@ -101,8 +101,11 @@ class ProjectService {
       
       console.log('ProjectService.createProject - dataToCreate:', dataToCreate);
 
-      const newProject = await this.projectRepository.create(dataToCreate);
-
+      const result = await this.projectRepository.create(dataToCreate);
+      
+      // Obtener el proyecto completo recién creado
+      const newProject = await this.projectRepository.findById(result.id);
+      
       return newProject;
     } catch (error) {
       console.error('Error en ProjectService.createProject:', error);
@@ -162,7 +165,11 @@ class ProjectService {
         }
       }
 
-      await this.projectRepository.deleteById(id);
+      const deletedRows = await this.projectRepository.deleteById(id);
+      if (deletedRows === 0) {
+        throw new Error('No se pudo eliminar el proyecto');
+      }
+      
       return { message: 'Proyecto eliminado correctamente' };
     } catch (error) {
       console.error('Error en ProjectService.deleteProject:', error);

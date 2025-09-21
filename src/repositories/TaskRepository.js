@@ -28,13 +28,11 @@ class TaskRepository extends BaseRepository {
       fecha_inicio,
       fecha_fin,
       usuario_asignado_id,
-      creado_por,
-      padre_tarea_id = null,
-      porcentaje_completado = 0
+      creado_por
     } = taskData;
 
     // Validar estados y prioridades válidas
-    const validStates = ['pendiente', 'en_progreso', 'en_revision', 'completada', 'cancelada'];
+    const validStates = ['pendiente', 'en_progreso', 'completada', 'cancelada'];
     const validPriorities = ['baja', 'media', 'alta']; // Sincronizado con TaskController
 
     if (!validStates.includes(estado)) {
@@ -43,10 +41,6 @@ class TaskRepository extends BaseRepository {
 
     if (!validPriorities.includes(prioridad)) {
       throw new Error('Prioridad de tarea inválida');
-    }
-
-    if (porcentaje_completado < 0 || porcentaje_completado > 100) {
-      throw new Error('El porcentaje completado debe estar entre 0 y 100');
     }
 
     return await this.insert({
@@ -59,8 +53,6 @@ class TaskRepository extends BaseRepository {
       fecha_fin,
       usuario_asignado_id: usuario_asignado_id || null,
       creado_por,
-      padre_tarea_id,
-      porcentaje_completado,
       created_at: new Date(),
       updated_at: new Date()
     });

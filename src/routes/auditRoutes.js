@@ -19,7 +19,7 @@ const auditController = new AuditController();
  * Acceso: solo admin
  */
 router.get('/roles', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin']),
   auditController.getRoleAuditLogs.bind(auditController)
 );
@@ -31,7 +31,7 @@ router.get('/roles',
  * Acceso: solo admin
  */
 router.get('/roles/user/:userId', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin']),
   auditController.getUserRoleAuditLogs.bind(auditController)
 );
@@ -43,7 +43,7 @@ router.get('/roles/user/:userId',
  * Acceso: solo admin
  */
 router.get('/roles/action/:action', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin']),
   auditController.getRoleAuditLogsByAction.bind(auditController)
 );
@@ -55,7 +55,7 @@ router.get('/roles/action/:action',
  * Acceso: solo admin
  */
 router.get('/roles/summary', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin']),
   auditController.getRoleAuditSummary.bind(auditController)
 );

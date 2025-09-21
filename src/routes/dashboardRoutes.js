@@ -18,7 +18,7 @@ const dashboardController = new DashboardController();
  * Permisos: Usuario autenticado
  */
 router.get('/summary', 
-  authenticate(),
+  authenticate,
   dashboardController.getDashboardSummary.bind(dashboardController)
 );
 
@@ -30,7 +30,7 @@ router.get('/summary',
 // GET /api/dashboard/projects/stats
 // Permisos: Usuario autenticado
 router.get('/projects/stats', 
-  authenticate(),
+  authenticate,
   dashboardController.getProjectStats.bind(dashboardController)
 );
 
@@ -38,7 +38,7 @@ router.get('/projects/stats',
 // GET /api/dashboard/projects/recent
 // Permisos: Usuario autenticado
 router.get('/projects/recent', 
-  authenticate(),
+  authenticate,
   dashboardController.getRecentProjects.bind(dashboardController)
 );
 
@@ -50,7 +50,7 @@ router.get('/projects/recent',
 // GET /api/dashboard/tasks/stats
 // Permisos: Usuario autenticado
 router.get('/tasks/stats', 
-  authenticate(),
+  authenticate,
   dashboardController.getTaskStats.bind(dashboardController)
 );
 
@@ -58,7 +58,7 @@ router.get('/tasks/stats',
 // GET /api/dashboard/tasks/recent
 // Permisos: Usuario autenticado
 router.get('/tasks/recent', 
-  authenticate(),
+  authenticate,
   dashboardController.getRecentTasks.bind(dashboardController)
 );
 
@@ -66,7 +66,7 @@ router.get('/tasks/recent',
 // GET /api/dashboard/tasks/pending
 // Permisos: Usuario autenticado
 router.get('/tasks/pending', 
-  authenticate(),
+  authenticate,
   dashboardController.getPendingTasks.bind(dashboardController)
 );
 
@@ -78,7 +78,7 @@ router.get('/tasks/pending',
 // GET /api/dashboard/admin/stats
 // Permisos: Solo administradores
 router.get('/admin/stats', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin']),
   dashboardController.getAdminStats.bind(dashboardController)
 );
@@ -87,7 +87,7 @@ router.get('/admin/stats',
 // GET /api/dashboard/admin/activity
 // Permisos: Solo administradores
 router.get('/admin/activity', 
-  authenticate(),
+  authenticate,
   requireAnyRole(['admin']),
   dashboardController.getRecentActivity.bind(dashboardController)
 );

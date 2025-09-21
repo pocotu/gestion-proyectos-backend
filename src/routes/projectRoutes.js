@@ -18,7 +18,7 @@ const projectController = new ProjectController();
  */
 
 // Middleware para todas las rutas de proyectos
-router.use(authenticate());
+router.use(authenticate);
 router.use(attachPermissions());
 
 /**
