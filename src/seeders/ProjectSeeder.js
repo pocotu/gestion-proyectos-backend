@@ -235,7 +235,7 @@ class ProjectSeeder extends BaseSeeder {
 
     console.log(`✅ Project validation passed. ${totalProjects[0].count} projects with ${activeProjects} active`);
 
-    return createdProjects;
+    return true; // Validación exitosa
   }
 
   /**

@@ -20,6 +20,9 @@ const { createAllTables } = require('./src/models');
 const { testConnection } = require('./src/config/db');
 const logger = require('./src/config/logger');
 
+// Importar el seeder manager
+const SeederManager = require('./src/seeders/index');
+
 async function renderDatabaseSetup() {
   const startTime = Date.now();
   
@@ -43,19 +46,29 @@ async function renderDatabaseSetup() {
     console.log('🔧 [RENDER-SETUP] Ejecutando configuración completa de tablas y datos...');
     await createAllTables();
     
+    // Ejecutar seeders para datos de ejemplo
+    console.log('🌱 [RENDER-SETUP] Ejecutando seeders para datos de ejemplo...');
+    const seederManager = new SeederManager();
+    await seederManager.runAll();
+    console.log('✅ [RENDER-SETUP] Seeders ejecutados exitosamente');
+    
     const duration = Date.now() - startTime;
     console.log(`🎉 [RENDER-SETUP] ¡Configuración completada exitosamente en ${duration}ms!`);
     console.log('📋 [RENDER-SETUP] Resumen de lo configurado:');
     console.log('   ✅ Todas las tablas creadas/verificadas');
     console.log('   ✅ Roles por defecto insertados');
     console.log('   ✅ Usuario administrador por defecto creado');
+    console.log('   ✅ Usuarios de ejemplo creados');
+    console.log('   ✅ Proyectos de ejemplo creados');
+    console.log('   ✅ Tareas de ejemplo creadas');
+    console.log('   ✅ Logs de actividad generados');
     console.log('   ✅ Transacciones confirmadas');
     
     // Información importante para el deploy
     console.log('');
     console.log('🔑 [RENDER-SETUP] CREDENCIALES DE ADMINISTRADOR:');
     console.log('   📧 Email: admin@gestion-proyectos.com');
-    console.log('   🔒 Password: Admin123!!');
+    console.log('   🔒 Password: Admin123!');
     console.log('   ⚠️  Cambia esta contraseña después del primer login');
     console.log('');
     
