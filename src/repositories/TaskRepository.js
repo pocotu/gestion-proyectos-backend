@@ -817,11 +817,14 @@ class TaskRepository extends BaseRepository {
 
       return {
         total: parseInt(total[0].count) || 0,
-        pendientes: parseInt(pendientes[0].count) || 0,
+        pending: parseInt(pendientes[0].count) || 0, // Frontend espera 'pending', no 'pendientes'
         en_progreso: parseInt(en_progreso[0].count) || 0,
         en_revision: parseInt(en_revision[0].count) || 0,
-        completadas: parseInt(completadas[0].count) || 0,
-        canceladas: parseInt(canceladas[0].count) || 0
+        completed: parseInt(completadas[0].count) || 0, // Frontend espera 'completed', no 'completadas'
+        canceladas: parseInt(canceladas[0].count) || 0,
+        // Mantener compatibilidad con versiones anteriores
+        pendientes: parseInt(pendientes[0].count) || 0,
+        completadas: parseInt(completadas[0].count) || 0
       };
     } catch (error) {
       console.error('Error en TaskRepository.getOverviewStats:', error);

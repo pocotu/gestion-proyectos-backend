@@ -33,21 +33,14 @@ class ProjectSeeder extends BaseSeeder {
     }
 
     const projectsData = [
+      // Proyectos EN PROGRESO (activos)
       {
         titulo: 'Sistema de Gestión de Inventario',
         descripcion: 'Desarrollo de un sistema completo para gestión de inventario con control de stock, reportes y alertas automáticas.',
         fecha_inicio: '2024-01-15',
         fecha_fin: '2024-06-30',
         estado: 'en_progreso',
-        creado_por: users[0].id // Usar el primer usuario disponible
-      },
-      {
-        titulo: 'Aplicación Móvil de Delivery',
-        descripcion: 'Aplicación móvil para servicio de delivery con geolocalización, pagos en línea y seguimiento en tiempo real.',
-        fecha_inicio: '2024-02-01',
-        fecha_fin: '2024-08-15',
-        estado: 'planificacion',
-        creado_por: users[1] ? users[1].id : users[0].id // Usar el segundo usuario si existe
+        creado_por: users[0].id
       },
       {
         titulo: 'Portal Web Corporativo',
@@ -55,7 +48,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-03-01',
         fecha_fin: '2024-07-31',
         estado: 'en_progreso',
-        creado_por: users[2] ? users[2].id : users[0].id // Usar el tercer usuario si existe
+        creado_por: users[2] ? users[2].id : users[0].id
       },
       {
         titulo: 'Sistema de Recursos Humanos',
@@ -63,7 +56,33 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-01-10',
         fecha_fin: '2024-12-31',
         estado: 'en_progreso',
-        creado_por: users[0].id // Usar el primer usuario disponible
+        creado_por: users[0].id
+      },
+      {
+        titulo: 'E-commerce Platform',
+        descripcion: 'Plataforma de comercio electrónico moderna con pagos integrados, gestión de inventario y analytics.',
+        fecha_inicio: '2024-02-20',
+        fecha_fin: '2024-09-15',
+        estado: 'en_progreso',
+        creado_por: users[1] ? users[1].id : users[0].id
+      },
+      {
+        titulo: 'Sistema de Facturación Electrónica',
+        descripcion: 'Sistema completo de facturación electrónica cumpliendo normativas fiscales con integración SAT.',
+        fecha_inicio: '2024-04-01',
+        fecha_fin: '2024-11-30',
+        estado: 'en_progreso',
+        creado_por: users[2] ? users[2].id : users[0].id
+      },
+
+      // Proyectos EN PLANIFICACIÓN (activos)
+      {
+        titulo: 'Aplicación Móvil de Delivery',
+        descripcion: 'Aplicación móvil para servicio de delivery con geolocalización, pagos en línea y seguimiento en tiempo real.',
+        fecha_inicio: '2024-02-01',
+        fecha_fin: '2024-08-15',
+        estado: 'planificacion',
+        creado_por: users[1] ? users[1].id : users[0].id
       },
       {
         titulo: 'API de Integración Bancaria',
@@ -71,15 +90,69 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-04-01',
         fecha_fin: '2024-09-30',
         estado: 'planificacion',
-        creado_por: users[1] ? users[1].id : users[0].id // Usar el segundo usuario si existe
+        creado_por: users[1] ? users[1].id : users[0].id
       },
+      {
+        titulo: 'Sistema de Business Intelligence',
+        descripcion: 'Plataforma de BI con dashboards interactivos, reportes automatizados y análisis predictivo.',
+        fecha_inicio: '2024-06-01',
+        fecha_fin: '2025-02-28',
+        estado: 'planificacion',
+        creado_por: users[0].id
+      },
+      {
+        titulo: 'App de Gestión de Proyectos Móvil',
+        descripcion: 'Versión móvil del sistema de gestión de proyectos con sincronización offline y notificaciones push.',
+        fecha_inicio: '2024-07-01',
+        fecha_fin: '2024-12-15',
+        estado: 'planificacion',
+        creado_por: users[2] ? users[2].id : users[0].id
+      },
+
+      // Proyectos COMPLETADOS
       {
         titulo: 'Dashboard de Analytics',
         descripcion: 'Dashboard interactivo para visualización de métricas y KPIs empresariales con reportes automatizados.',
         fecha_inicio: '2024-02-15',
         fecha_fin: '2024-05-30',
         estado: 'completado',
-        creado_por: users[2] ? users[2].id : users[0].id // Usar el tercer usuario si existe
+        creado_por: users[2] ? users[2].id : users[0].id
+      },
+      {
+        titulo: 'Sistema de Autenticación SSO',
+        descripcion: 'Implementación de Single Sign-On para todos los sistemas corporativos con integración LDAP.',
+        fecha_inicio: '2023-11-01',
+        fecha_fin: '2024-02-28',
+        estado: 'completado',
+        creado_por: users[0].id
+      },
+      {
+        titulo: 'Migración a Cloud AWS',
+        descripcion: 'Migración completa de infraestructura legacy a AWS con alta disponibilidad y escalabilidad.',
+        fecha_inicio: '2023-09-15',
+        fecha_fin: '2024-01-31',
+        estado: 'completado',
+        creado_por: users[1] ? users[1].id : users[0].id
+      },
+
+      // Proyecto EN PROGRESO (pausado → en_progreso)
+      {
+        titulo: 'Sistema de IoT Industrial',
+        descripcion: 'Plataforma para monitoreo y control de dispositivos IoT en entornos industriales.',
+        fecha_inicio: '2024-03-15',
+        fecha_fin: '2024-10-30',
+        estado: 'en_progreso', // Cambiar de 'pausado' a 'en_progreso'
+        creado_por: users[2] ? users[2].id : users[0].id
+      },
+
+      // Proyecto CANCELADO
+      {
+        titulo: 'Blockchain Supply Chain',
+        descripcion: 'Sistema de trazabilidad de cadena de suministro basado en blockchain (cancelado por presupuesto).',
+        fecha_inicio: '2024-01-01',
+        fecha_fin: '2024-08-31',
+        estado: 'cancelado',
+        creado_por: users[1] ? users[1].id : users[0].id
       }
     ];
 
@@ -108,6 +181,59 @@ class ProjectSeeder extends BaseSeeder {
     // Verificar que los proyectos fueron creados
     const totalProjects = await this.execute('SELECT COUNT(*) as count FROM proyectos');
     console.log(`✅ Projects seeded successfully. Total projects: ${totalProjects[0].count}`);
+
+    // Mostrar distribución por estado
+    const distribution = await this.execute(`
+      SELECT estado, COUNT(*) as count 
+      FROM proyectos 
+      GROUP BY estado 
+      ORDER BY count DESC
+    `);
+    console.log('📊 Project distribution by status:');
+    distribution.forEach(d => {
+      console.log(`   - ${d.estado}: ${d.count} projects`);
+    });
+
+    return createdProjects;
+  }
+
+  /**
+   * Valida que los proyectos fueron creados correctamente
+   */
+  async validate() {
+    // Verificar que hay suficientes proyectos
+    const totalProjects = await this.execute('SELECT COUNT(*) as count FROM proyectos');
+    if (totalProjects[0].count < 10) {
+      throw new Error(`Not enough projects created. Expected at least 10, got ${totalProjects[0].count}`);
+    }
+
+    // Verificar distribución de estados
+    const distribution = await this.execute(`
+      SELECT estado, COUNT(*) as count 
+      FROM proyectos 
+      GROUP BY estado 
+      ORDER BY count DESC
+    `);
+
+    const states = distribution.map(d => d.estado);
+    const requiredStates = ['en_progreso', 'planificacion', 'completado'];
+    
+    for (const requiredState of requiredStates) {
+      if (!states.includes(requiredState)) {
+        throw new Error(`Missing required project state: ${requiredState}`);
+      }
+    }
+
+    // Verificar que hay proyectos activos (en_progreso + planificacion)
+    const activeProjects = distribution
+      .filter(d => d.estado === 'en_progreso' || d.estado === 'planificacion')
+      .reduce((sum, d) => sum + d.count, 0);
+
+    if (activeProjects === 0) {
+      throw new Error('No active projects found (en_progreso + planificacion)');
+    }
+
+    console.log(`✅ Project validation passed. ${totalProjects[0].count} projects with ${activeProjects} active`);
 
     return createdProjects;
   }

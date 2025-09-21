@@ -600,11 +600,14 @@ class ProjectRepository extends BaseRepository {
 
       return {
         total: parseInt(total[0].count) || 0,
-        activos: activos || 0,
-        completados: parseInt(completados[0].count) || 0,
+        active: activos || 0, // Frontend espera 'active', no 'activos'
+        completed: parseInt(completados[0].count) || 0, // Frontend espera 'completed', no 'completados'
         planificacion: parseInt(planificacion[0].count) || 0,
         en_progreso: parseInt(en_progreso[0].count) || 0,
-        cancelados: parseInt(cancelados[0].count) || 0
+        cancelados: parseInt(cancelados[0].count) || 0,
+        // Mantener compatibilidad con versiones anteriores
+        activos: activos || 0,
+        completados: parseInt(completados[0].count) || 0
       };
     } catch (error) {
       console.error('Error en ProjectRepository.getOverviewStats:', error);
