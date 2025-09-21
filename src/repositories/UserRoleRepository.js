@@ -61,47 +61,42 @@ class UserRoleRepository extends BaseRepository {
    */
   /**
    * Obtiene los roles de un usuario específico
-   * Método estático completamente independiente para evitar cualquier conflicto
+   * Método estático que usa el pool de conexiones correctamente
    */
   static async getUserRolesStatic(userId) {
     try {
-      console.log('getUserRolesStatic - Iniciando para userId:', userId);
+      console.log('🔍 [USER-ROLE-REPO] getUserRolesStatic - Iniciando para userId:', userId);
       
-      // Crear conexión independiente para evitar conflictos
-      const mysql = require('mysql2/promise');
-      const connection = await mysql.createConnection({
-        host: process.env.DB_HOST || 'localhost',
-        user: process.env.DB_USER || 'root',
-        password: process.env.DB_PASSWORD || '',
-        database: process.env.DB_NAME || 'gestion_proyectos'
-      });
-      
-      // Query SQL con alias únicos para evitar conflictos - solo columnas que existen
+      // Usar el pool en lugar de crear una conexión individual
       const query = `
         SELECT 
           ur.id,
           ur.usuario_id,
           ur.rol_id,
           ur.created_at,
-          role_table.nombre as rol_nombre
+          r.nombre as rol_nombre
         FROM usuario_roles ur
-        INNER JOIN roles role_table ON ur.rol_id = role_table.id
+        INNER JOIN roles r ON ur.rol_id = r.id
         WHERE ur.usuario_id = ?
-        ORDER BY role_table.nombre ASC
+        ORDER BY r.nombre ASC
       `;
       
-      console.log('getUserRolesStatic - Ejecutando query SQL directa con alias únicos');
+      console.log('🔍 [USER-ROLE-REPO] Ejecutando query con pool...');
       
-      const [result] = await connection.execute(query, [userId]);
+      const [result] = await pool.execute(query, [userId]);
       
-      await connection.end();
+      console.log('🔍 [USER-ROLE-REPO] Resultado obtenido:', result.length, 'roles');
       
-      console.log('getUserRolesStatic - Resultado obtenido:', result.length, 'roles');
+      if (result.length > 0) {
+        console.log('🔍 [USER-ROLE-REPO] Roles encontrados:', result.map(r => r.rol_nombre));
+      } else {
+        console.log('🔍 [USER-ROLE-REPO] No se encontraron roles para el usuario:', userId);
+      }
       
       return result;
     } catch (error) {
-      console.error('getUserRolesStatic - Error:', error.message);
-      console.error('getUserRolesStatic - Stack:', error.stack);
+      console.error('🔍 [USER-ROLE-REPO] getUserRolesStatic - Error:', error.message);
+      console.error('🔍 [USER-ROLE-REPO] getUserRolesStatic - Stack:', error.stack);
       throw error;
     }
   }

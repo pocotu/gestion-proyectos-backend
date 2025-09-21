@@ -58,8 +58,15 @@ class BaseSeeder {
    * Ejecuta una query con parámetros
    */
   async execute(query, params = []) {
+    // Si no hay conexión activa, crear una temporal para la query
     if (!this.connection) {
-      throw new Error('No database connection available');
+      const tempConnection = await pool.getConnection();
+      try {
+        const [result] = await tempConnection.execute(query, params);
+        return result;
+      } finally {
+        tempConnection.release();
+      }
     }
     
     const [result] = await this.connection.execute(query, params);
@@ -77,7 +84,7 @@ class BaseSeeder {
     const values = Object.values(conditions);
     const query = `SELECT COUNT(*) as count FROM ${table} WHERE ${whereClause}`;
     
-    const [rows] = await this.connection.execute(query, values);
+    const rows = await this.execute(query, values);
     return rows[0].count > 0;
   }
 
@@ -122,7 +129,7 @@ class BaseSeeder {
     const values = Object.values(conditions);
     const query = `SELECT id FROM ${table} WHERE ${whereClause} LIMIT 1`;
     
-    const [rows] = await this.connection.execute(query, values);
+    const rows = await this.execute(query, values);
     return rows[0]?.id || null;
   }
 

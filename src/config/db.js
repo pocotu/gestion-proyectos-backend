@@ -11,10 +11,11 @@ const pool = mysql.createPool({
   database: config.DB_NAME,
   connectionLimit: config.DB_CONNECTION_LIMIT,
   queueLimit: config.DB_QUEUE_LIMIT,
-  // Removed invalid options for MySQL2:
-  // - acquireTimeout (not supported in mysql2)
-  // - timeout (not supported in mysql2) 
-  // - reconnect (not supported in mysql2)
+  // Configuraciones válidas para mysql2
+  waitForConnections: true,
+  idleTimeout: 300000,    // 5 minutos de timeout para conexiones idle
+  enableKeepAlive: true,  // Mantener conexiones vivas
+  keepAliveInitialDelay: 0
 });
 
 // Test database connection
@@ -30,4 +31,25 @@ async function testConnection() {
   }
 }
 
-module.exports = { pool, testConnection };
+// Eventos del pool para debugging
+pool.on('connection', (connection) => {
+  console.log('🔗 [DB-POOL] Nueva conexión establecida como id:', connection.threadId);
+});
+
+pool.on('error', (err) => {
+  console.error('💥 [DB-POOL] Error en el pool de conexiones:', err.message);
+  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+    console.error('🔄 [DB-POOL] Conexión perdida, intentando reconectar...');
+  }
+});
+
+// Función para obtener el estado del pool
+function getPoolStatus() {
+  return {
+    totalConnections: pool._allConnections ? pool._allConnections.length : 0,
+    freeConnections: pool._freeConnections ? pool._freeConnections.length : 0,
+    connectionQueue: pool._connectionQueue ? pool._connectionQueue.length : 0
+  };
+}
+
+module.exports = { pool, testConnection, getPoolStatus };
