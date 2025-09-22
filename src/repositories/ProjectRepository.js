@@ -35,8 +35,80 @@ class ProjectRepository extends BaseRepository {
   /**
    * Obtiene todos los proyectos ordenados por fecha de creación
    */
-  async findAll() {
-    return await this.orderBy('created_at', 'DESC').get();
+  async findAll({ limit = 10, offset = 0, filters = {}, isAdmin = false } = {}) {
+    try {
+      // Crear una nueva instancia del query builder para evitar conflictos de estado
+      let query = new BaseRepository(this.tableName);
+      query = query.orderBy('created_at', 'DESC');
+      
+      // Aplicar filtros si existen
+      if (filters.estado) {
+        query = query.where('estado', filters.estado);
+      }
+      
+      if (filters.titulo) {
+        query = query.whereLike('titulo', `%${filters.titulo}%`);
+      }
+      
+      if (filters.creado_por && !isAdmin) {
+        query = query.where('creado_por', filters.creado_por);
+      }
+      
+      // Aplicar paginación
+      if (limit > 0) {
+        query = query.limit(limit);
+      }
+      
+      if (offset > 0) {
+        query = query.offset(offset);
+      }
+      
+      return await query.get();
+    } catch (error) {
+      console.error('Error en ProjectRepository.findAll:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Contar proyectos con filtros
+   */
+  async count(filters = {}, isAdmin = false) {
+    try {
+      // Construir query SQL directamente para evitar conflictos de estado
+      let query = `SELECT COUNT(*) as total FROM ${this.tableName}`;
+      const params = [];
+      const conditions = [];
+      
+      // Aplicar filtros si existen
+      if (filters.estado) {
+        conditions.push('estado = ?');
+        params.push(filters.estado);
+      }
+      
+      if (filters.titulo) {
+        conditions.push('titulo LIKE ?');
+        params.push(`%${filters.titulo}%`);
+      }
+      
+      if (filters.creado_por && !isAdmin) {
+        conditions.push('creado_por = ?');
+        params.push(filters.creado_por);
+      }
+      
+      // Agregar condiciones WHERE si existen
+      if (conditions.length > 0) {
+        query += ` WHERE ${conditions.join(' AND ')}`;
+      }
+      
+      // Ejecutar query directamente
+      const { pool } = require('../config/db');
+      const [rows] = await pool.execute(query, params);
+      return rows[0]?.total || 0;
+    } catch (error) {
+      console.error('Error en ProjectRepository.count:', error);
+      return 0;
+    }
   }
 
   /**
@@ -265,20 +337,57 @@ class ProjectRepository extends BaseRepository {
   async create(projectData) {
     const { titulo, descripcion, fecha_inicio, fecha_fin, creado_por, estado } = projectData;
 
+    // Convertir fechas a formato MySQL YYYY-MM-DD
+    const formatDateForMySQL = (dateValue) => {
+      if (!dateValue) return null;
+      
+      let date;
+      if (dateValue instanceof Date) {
+        date = dateValue;
+      } else if (typeof dateValue === 'string') {
+        date = new Date(dateValue);
+      } else {
+        return null;
+      }
+      
+      if (isNaN(date.getTime())) return null;
+      
+      // Formatear como YYYY-MM-DD para MySQL
+      return date.toISOString().split('T')[0];
+    };
+
     const data = {
       titulo,
       descripcion: descripcion || null,
-      fecha_inicio: fecha_inicio || null,
-      fecha_fin: fecha_fin || null,
+      fecha_inicio: formatDateForMySQL(fecha_inicio),
+      fecha_fin: formatDateForMySQL(fecha_fin),
       creado_por: creado_por,
       estado: estado || 'planificacion'
     };
 
-    console.log('ProjectRepository.create - datos a insertar:', data);
+    // Filtrar campos undefined y created_at/updated_at que no están en la tabla
+    const cleanData = {};
+    const allowedFields = ['titulo', 'descripcion', 'fecha_inicio', 'fecha_fin', 'creado_por', 'estado'];
+    
+    for (const field of allowedFields) {
+      if (data[field] !== undefined) {
+        cleanData[field] = data[field];
+      }
+    }
+
+    console.log('ProjectRepository.create - datos a insertar:', cleanData);
     try {
-        const result = await this.insert(data);
-        return await this.findById(result.insertId);
+        const result = await this.insert(cleanData);
+        console.log('ProjectRepository.create - resultado insert:', result);
+        
+        // Usar una nueva instancia del repository para evitar conflictos de estado
+        const newRepo = new (this.constructor)();
+        const createdProject = await newRepo.findById(result.id);
+        console.log('ProjectRepository.create - proyecto creado:', createdProject);
+        
+        return createdProject;
     } catch (error) {
+        console.error('ProjectRepository.create - error completo:', error);
         throw new Error(`Error creating project: ${error.message}`);
     }
   }
@@ -631,7 +740,7 @@ class ProjectRepository extends BaseRepository {
         params = [userId];
       }
 
-      query += whereClause + ' ORDER BY proyectos.fecha_creacion DESC LIMIT ?';
+      query += whereClause + ' ORDER BY proyectos.created_at DESC LIMIT ?';
       params.push(limit);
 
       const [rows] = await pool.execute(query, params);

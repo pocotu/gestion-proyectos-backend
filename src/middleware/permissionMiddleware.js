@@ -157,9 +157,27 @@ class PermissionMiddleware {
    */
   requireUserManagement() {
     console.log('🔑 [PERMISSION-MIDDLEWARE] requireUserManagement - Iniciando');
-    const result = this.requirePermission(PERMISSIONS.USERS.MANAGE_ROLES);
-    console.log('🔑 [PERMISSION-MIDDLEWARE] requireUserManagement - Retornando middleware');
-    return result;
+    const middlewareFunction = this.requirePermission(PERMISSIONS.USERS.MANAGE_ROLES);
+    console.log('🔑 [PERMISSION-MIDDLEWARE] requireUserManagement - Middleware creado, retornando función');
+    
+    // Envolver el middleware para agregar logs adicionales
+    return async (req, res, next) => {
+      console.log('🔑 [PERMISSION-MIDDLEWARE] requireUserManagement - Ejecutando middleware wrapper');
+      try {
+        await middlewareFunction(req, res, (error) => {
+          console.log('🔑 [PERMISSION-MIDDLEWARE] requireUserManagement - Callback de next() llamado');
+          if (error) {
+            console.error('🔑 [PERMISSION-MIDDLEWARE] requireUserManagement - Error en callback:', error);
+            return next(error);
+          }
+          console.log('🔑 [PERMISSION-MIDDLEWARE] requireUserManagement - Llamando next() final');
+          next();
+        });
+      } catch (error) {
+        console.error('🔑 [PERMISSION-MIDDLEWARE] requireUserManagement - Error en wrapper:', error);
+        next(error);
+      }
+    };
   }
 
   /**

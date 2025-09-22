@@ -1,4 +1,5 @@
 const UserService = require('../services/userService');
+const RoleService = require('../services/roleService');
 // const UserSettingsService = require('../services/userSettingsService'); // Comentado temporalmente
 const { 
   requirePermission, 
@@ -19,6 +20,7 @@ const {
 class UserController {
   constructor() {
     this.userService = new UserService();
+    this.roleService = new RoleService();
     // this.userSettingsService = new UserSettingsService(); // Comentado temporalmente
   }
 
@@ -309,39 +311,42 @@ class UserController {
    * Permisos: Admin - Acceso total, gestión de usuarios y roles
    */
   async assignRole(req, res) {
+    console.log('🎯 [USER-CONTROLLER] assignRole - Iniciando');
+    console.log('🎯 [USER-CONTROLLER] assignRole - req.params:', req.params);
+    console.log('🎯 [USER-CONTROLLER] assignRole - req.body:', req.body);
+    
     try {
-      const userId = parseInt(req.params.id);
+      const { id: userId } = req.params;
       const { roleId } = req.body;
-      const assignedBy = req.user.id;
 
-      if (!roleId) {
+      console.log('🎯 [USER-CONTROLLER] assignRole - userId:', userId, 'roleId:', roleId);
+
+      if (!userId || !roleId) {
+        console.log('🎯 [USER-CONTROLLER] assignRole - Faltan parámetros');
         return res.status(400).json({
           success: false,
-          message: 'El ID del rol es requerido'
+          message: 'Se requieren userId y roleId'
         });
       }
 
-      const result = await this.userService.assignRoleToUser(userId, roleId, assignedBy);
+      console.log('🎯 [USER-CONTROLLER] assignRole - Llamando al servicio');
+      const result = await this.userService.assignRoleToUser(userId, roleId, req.user.id);
+      console.log('🎯 [USER-CONTROLLER] assignRole - Resultado del servicio:', result);
 
-      res.status(201).json({
+      res.status(200).json({
         success: true,
         message: 'Rol asignado exitosamente',
         data: result
       });
+      console.log('🎯 [USER-CONTROLLER] assignRole - Respuesta enviada');
 
     } catch (error) {
-      console.error('Error asignando rol:', error);
+      console.error('🎯 [USER-CONTROLLER] assignRole - Error completo:', error);
+      console.error('🎯 [USER-CONTROLLER] assignRole - Stack:', error.stack);
       
-      if (error.message.includes('no encontrado')) {
-        return res.status(404).json({
-          success: false,
-          message: error.message
-        });
-      }
-
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor'
+        message: error.message || 'Error interno del servidor'
       });
     }
   }

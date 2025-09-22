@@ -307,7 +307,8 @@ class RoleService {
         id: role.id,
         usuario_id: role.usuario_id,
         rol_id: role.rol_id,
-        rol_nombre: role.rol_nombre,
+        nombre: role.rol_nombre, // Usar 'nombre' para consistencia con el test
+        rol_nombre: role.rol_nombre, // Mantener también rol_nombre para compatibilidad
         created_at: role.created_at
       }));
 

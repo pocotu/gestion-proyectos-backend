@@ -86,7 +86,7 @@ class ProjectService {
     try {
       const dataToCreate = {
         ...projectData,
-        created_by: createdBy,
+        creado_por: createdBy,  // Cambiar created_by por creado_por
         created_at: new Date(),
         updated_at: new Date()
       };

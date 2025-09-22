@@ -258,11 +258,24 @@ class BaseRepository {
    * Inserta un nuevo registro
    */
   async insert(data) {
-    const fields = Object.keys(data);
-    const values = Object.values(data);
+    // Filtrar valores undefined antes de insertar
+    const cleanData = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleanData[key] = value;
+      }
+    }
+    
+    console.log('BaseRepository.insert - datos limpios:', cleanData);
+    console.log('BaseRepository.insert - valores:', Object.values(cleanData));
+    
+    const fields = Object.keys(cleanData);
+    const values = Object.values(cleanData);
     const placeholders = fields.map(() => '?').join(', ');
     
     const query = `INSERT INTO ${this.tableName} (${fields.join(', ')}) VALUES (${placeholders})`;
+    console.log('BaseRepository.insert - query:', query);
+    
     const [result] = await pool.execute(query, values);
     
     return {

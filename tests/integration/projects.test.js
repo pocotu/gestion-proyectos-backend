@@ -44,7 +44,7 @@ describe('Projects Integration Tests - MVP', () => {
 
   // Cleanup después de cada test
   afterEach(async () => {
-    // Solo limpiar proyectos y tareas, no usuarios
+    // Solo limpiar proyectos y tareas, NO usuarios para mantener la autenticación
     if (db && db.connection) {
       try {
         await db.connection.execute('SET FOREIGN_KEY_CHECKS = 0');
@@ -60,6 +60,19 @@ describe('Projects Integration Tests - MVP', () => {
   // Cleanup global
   afterAll(async () => {
     logger.testEnd('Finalizando tests de proyectos');
+    
+    // Solo limpiar proyectos y tareas, NO usuarios para evitar problemas con tokens
+    if (db && db.connection) {
+      try {
+        await db.connection.execute('SET FOREIGN_KEY_CHECKS = 0');
+        await db.connection.execute('DELETE FROM tareas WHERE proyecto_id IN (SELECT id FROM proyectos WHERE titulo LIKE "%test%" OR titulo LIKE "%prueba%")');
+        await db.connection.execute('DELETE FROM proyectos WHERE titulo LIKE "%test%" OR titulo LIKE "%prueba%"');
+        await db.connection.execute('SET FOREIGN_KEY_CHECKS = 1');
+      } catch (error) {
+        console.error('Error limpiando datos finales:', error.message);
+      }
+    }
+    
     await db.close();
   });
 

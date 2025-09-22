@@ -62,18 +62,33 @@ class AuthHelper {
 
     const user = loginResponse.body.data?.user || registerResponse.body.user;
     
-    // Asegurar que el usuario tenga el rol de responsable_proyecto para crear proyectos
-    if (!user.es_administrador) {
+    // Asegurar que el usuario admin tenga el rol admin asignado explícitamente
+    if (user.es_administrador) {
+      try {
+        console.log('Asignando rol admin al usuario administrador...');
+        await request(app)
+          .post('/api/roles/assign')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            userId: user.id,
+            roleIdentifier: 'admin'
+          });
+        console.log('Rol admin asignado exitosamente');
+      } catch (error) {
+        console.warn('Error asignando rol admin (puede que ya lo tenga):', error.message);
+      }
+    } else {
+      // Para usuarios no admin, asignar rol de responsable_proyecto
       try {
         await request(app)
           .post('/api/roles/assign')
           .set('Authorization', `Bearer ${token}`)
           .send({
-            usuario_id: user.id,
-            rol_nombre: 'responsable_proyecto'
+            userId: user.id,
+            roleIdentifier: 'responsable_proyecto'
           });
       } catch (error) {
-        // Ignorar errores de asignación de rol para admin
+        console.warn('Error asignando rol responsable_proyecto:', error.message);
       }
     }
 

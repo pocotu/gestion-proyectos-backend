@@ -133,6 +133,26 @@ class AuthService {
   }
 
   /**
+   * Verifica un token y devuelve información del usuario
+   * @param {string} token - Token JWT
+   * @returns {Object} Información del usuario
+   */
+  async verifyToken(token) {
+    try {
+      // Verificar el token JWT
+      const payload = this.verifyJWT(token);
+      
+      // Obtener información actualizada del usuario
+      const user = await this.getUserInfo(payload.id);
+      
+      return user;
+    } catch (error) {
+      console.error('Error verificando token:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Genera un JWT para el usuario
    * @param {Object} user - Usuario
    * @returns {string} Token JWT

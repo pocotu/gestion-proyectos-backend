@@ -110,7 +110,7 @@ router.put('/:id',
 // DELETE /api/users/:id
 // Permisos: Solo Admin
 router.delete('/:id', 
-  requireUserManagement,
+  requireUserManagement(),
   userController.deleteUser.bind(userController)
 );
 
@@ -118,7 +118,7 @@ router.delete('/:id',
 // PATCH /api/users/:id/status
 // Permisos: Solo Admin
 router.patch('/:id/status', 
-  requireUserManagement,
+  requireUserManagement(),
   userController.changeUserStatus.bind(userController)
 );
 
@@ -130,7 +130,7 @@ router.patch('/:id/status',
 // POST /api/users/:id/roles
 // Permisos: Solo Admin
 router.post('/:id/roles', 
-  requireUserManagement,
+  requireUserManagement(),
   userController.assignRole.bind(userController)
 );
 
@@ -138,7 +138,7 @@ router.post('/:id/roles',
 // DELETE /api/users/:id/roles/:roleId
 // Permisos: Solo Admin
 router.delete('/:id/roles/:roleId', 
-  requireUserManagement,
+  requireUserManagement(),
   userController.removeRole.bind(userController)
 );
 

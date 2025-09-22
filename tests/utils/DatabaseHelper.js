@@ -42,7 +42,7 @@ class DatabaseHelper {
    */
   async verifyTables() {
     const requiredTables = [
-      'usuarios', 'proyectos', 'tareas'
+      'usuarios', 'proyectos', 'tareas', 'roles', 'usuario_roles'
     ];
 
     for (const table of requiredTables) {
@@ -53,6 +53,50 @@ class DatabaseHelper {
       
       if (rows[0].count === 0) {
         throw new Error(`Tabla requerida '${table}' no existe en la base de datos de test`);
+      }
+    }
+    
+    // Crear roles por defecto si no existen
+    await this.createDefaultRoles();
+  }
+
+  /**
+   * Crea los roles por defecto necesarios para los tests
+   */
+  async createDefaultRoles() {
+    const defaultRoles = [
+      {
+        nombre: 'admin',
+        descripcion: 'Administrador del sistema con acceso completo'
+      },
+      {
+        nombre: 'responsable_proyecto',
+        descripcion: 'Responsable de proyectos con permisos de gestión'
+      },
+      {
+        nombre: 'responsable_tarea',
+        descripcion: 'Responsable de tareas con permisos limitados'
+      }
+    ];
+
+    for (const role of defaultRoles) {
+      try {
+        // Verificar si el rol ya existe
+        const [existing] = await this.connection.execute(
+          'SELECT id FROM roles WHERE nombre = ?',
+          [role.nombre]
+        );
+
+        if (existing.length === 0) {
+          // Crear el rol si no existe
+          await this.connection.execute(
+            'INSERT INTO roles (nombre, descripcion) VALUES (?, ?)',
+            [role.nombre, role.descripcion]
+          );
+          console.log(`✅ Rol '${role.nombre}' creado en la base de datos de test`);
+        }
+      } catch (error) {
+        console.error(`Error creando rol '${role.nombre}':`, error.message);
       }
     }
   }

@@ -667,8 +667,8 @@ class TaskRepository extends BaseRepository {
    */
   async projectExists(proyecto_id) {
     const query = 'SELECT COUNT(*) as count FROM proyectos WHERE id = ?';
-    const result = await this.db.query(query, [proyecto_id]);
-    const exists = result.rows[0].count > 0;
+    const [rows] = await pool.execute(query, [proyecto_id]);
+    const exists = rows[0].count > 0;
     return exists;
   }
 
@@ -677,8 +677,8 @@ class TaskRepository extends BaseRepository {
    */
   async userExists(usuario_id) {
     const query = 'SELECT COUNT(*) as count FROM usuarios WHERE id = ?';
-    const result = await this.db.query(query, [usuario_id]);
-    const exists = result.rows[0].count > 0;
+    const [rows] = await pool.execute(query, [usuario_id]);
+    const exists = rows[0].count > 0;
     return exists;
   }
 

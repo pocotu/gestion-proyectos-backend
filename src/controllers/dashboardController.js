@@ -11,12 +11,14 @@
 const UserService = require('../services/userService');
 const ProjectService = require('../services/projectService');
 const TaskService = require('../services/taskService');
+const LogActivityRepository = require('../repositories/LogActivityRepository');
 
 class DashboardController {
   constructor() {
     this.userService = new UserService();
     this.projectService = new ProjectService();
     this.taskService = new TaskService();
+    this.logRepository = new LogActivityRepository();
   }
 
   /**

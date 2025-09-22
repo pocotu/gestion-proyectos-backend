@@ -9,6 +9,9 @@ module.exports = {
   clearMocks: true,
   collectCoverage: false,
   bail: false,
-  setupFilesAfterEnv: [],
-  testSequencer: '<rootDir>/node_modules/@jest/test-sequencer/build/index.js'
+  setupFilesAfterEnv: ['<rootDir>/tests/utils/setup.js'],
+  testSequencer: '<rootDir>/node_modules/@jest/test-sequencer/build/index.js',
+  globals: {
+    'jest': true
+  }
 };
