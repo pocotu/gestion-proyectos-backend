@@ -10,8 +10,8 @@ const BaseRepository = require('./BaseRepository');
  * - Dependency Inversion: Depende de BaseRepository (abstracción)
  */
 class FileRepository extends BaseRepository {
-  constructor() {
-    super('archivos');
+  constructor(tableName = 'archivos_tarea') {
+    super(tableName);
   }
 
   /**
@@ -96,15 +96,13 @@ class FileRepository extends BaseRepository {
     
     let query = this
       .select(`
-        archivos.*,
-        proyectos.titulo as proyecto_titulo,
+        ${this.tableName}.*,
         usuarios.nombre as subido_por_nombre,
         usuarios.email as subido_por_email
       `)
-      .leftJoin('proyectos', 'archivos.proyecto_id', 'proyectos.id')
-      .leftJoin('usuarios', 'archivos.subido_por', 'usuarios.id')
-      .where('archivos.tarea_id', tarea_id)
-      .orderBy('archivos.created_at', 'DESC');
+      .leftJoin('usuarios', `${this.tableName}.subido_por`, 'usuarios.id')
+      .where(`${this.tableName}.tarea_id`, tarea_id)
+      .orderBy(`${this.tableName}.created_at`, 'DESC');
     
     if (limit) {
       query = query.limit(limit);
@@ -611,7 +609,7 @@ class FileRepository extends BaseRepository {
    */
   async countByTask(tarea_id, userId = null, isAdmin = false) {
     const result = await this
-      .where('archivos.tarea_id', tarea_id)
+      .where(`${this.tableName}.tarea_id`, tarea_id)
       .count();
     
     return result;

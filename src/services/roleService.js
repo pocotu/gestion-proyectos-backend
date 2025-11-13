@@ -471,6 +471,15 @@ class RoleService {
   }
 
   /**
+   * Obtiene un rol por su nombre
+   * @param {string} roleName - Nombre del rol
+   * @returns {Object|null} Rol encontrado o null
+   */
+  async getRoleByName(roleName) {
+    return await this.roleRepository.findByName(roleName);
+  }
+
+  /**
    * Método privado para obtener un rol por ID o nombre
    * @param {number|string} identifier - ID o nombre del rol
    * @returns {Object|null} Rol encontrado o null

@@ -1,6 +1,7 @@
 const ProjectRepository = require('../repositories/ProjectRepository');
 const ProjectResponsibleRepository = require('../repositories/ProjectResponsibleRepository');
 const UserRepository = require('../repositories/UserRepository');
+const { NotFoundError, ValidationError, ConflictError } = require('../utils/errors');
 
 /**
  * ProjectService - Servicio para gestión de proyectos
@@ -37,10 +38,7 @@ class ProjectService {
       return {
         projects,
         pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
+          page, limit, total, pages: Math.ceil(total / limit)
         }
       };
     } catch (error) {
@@ -57,7 +55,7 @@ class ProjectService {
       const project = await this.projectRepository.findById(id);
       
       if (!project) {
-        throw new Error('Proyecto no encontrado');
+        throw new NotFoundError('Proyecto no encontrado');
       }
 
       // Verificar acceso si no es admin
@@ -104,7 +102,7 @@ class ProjectService {
     try {
       const existingProject = await this.projectRepository.findById(id);
       if (!existingProject) {
-        throw new Error('Proyecto no encontrado');
+        throw new NotFoundError('Proyecto no encontrado');
       }
 
       // Verificar acceso si no es admin
@@ -138,7 +136,18 @@ class ProjectService {
     try {
       const project = await this.projectRepository.findById(id);
       if (!project) {
-        throw new Error('Proyecto no encontrado');
+        throw new NotFoundError('Proyecto no encontrado');
+      }
+
+      // Verificar si el proyecto tiene tareas asociadas
+      const TaskRepository = require('../repositories/TaskRepository');
+      const taskRepository = new TaskRepository();
+      const tasks = await taskRepository.findByProject(id, false);
+      
+      if (tasks && tasks.length > 0) {
+        const error = new Error('No se puede eliminar un proyecto que tiene tareas asociadas');
+        error.statusCode = 400;
+        throw error;
       }
 
       // Verificar acceso si no es admin
@@ -168,7 +177,7 @@ class ProjectService {
     try {
       const project = await this.projectRepository.findById(id);
       if (!project) {
-        throw new Error('Proyecto no encontrado');
+        throw new NotFoundError('Proyecto no encontrado');
       }
 
       // Verificar acceso si no es admin
@@ -206,7 +215,7 @@ class ProjectService {
     try {
       const project = await this.projectRepository.findById(projectId);
       if (!project) {
-        throw new Error('Proyecto no encontrado');
+        throw new NotFoundError('Proyecto no encontrado');
       }
 
       // Verificar si ya es responsable
@@ -254,7 +263,7 @@ class ProjectService {
     try {
       const project = await this.projectRepository.findById(projectId);
       if (!project) {
-        throw new Error('Proyecto no encontrado');
+        throw new NotFoundError('Proyecto no encontrado');
       }
 
       const responsibles = await this.projectResponsibleRepository.getProjectResponsibles(projectId);
@@ -272,7 +281,7 @@ class ProjectService {
     try {
       const project = await this.projectRepository.findById(projectId);
       if (!project) {
-        throw new Error('Proyecto no encontrado');
+        throw new NotFoundError('Proyecto no encontrado');
       }
 
       // Verificar acceso si no es admin
@@ -298,7 +307,7 @@ class ProjectService {
     try {
       const project = await this.projectRepository.findById(projectId);
       if (!project) {
-        throw new Error('Proyecto no encontrado');
+        throw new NotFoundError('Proyecto no encontrado');
       }
 
       // Verificar acceso si no es admin
@@ -358,10 +367,7 @@ class ProjectService {
       return {
         projects,
         pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
+          page, limit, total, pages: Math.ceil(total / limit)
         }
       };
     } catch (error) {
@@ -389,10 +395,7 @@ class ProjectService {
       return {
         projects,
         pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
+          page, limit, total, pages: Math.ceil(total / limit)
         }
       };
     } catch (error) {
@@ -504,10 +507,7 @@ class ProjectService {
       return {
         projects,
         pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
+          page, limit, total, pages: Math.ceil(total / limit)
         }
       };
     } catch (error) {
@@ -518,3 +518,7 @@ class ProjectService {
 }
 
 module.exports = ProjectService;
+
+
+
+

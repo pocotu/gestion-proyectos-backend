@@ -176,6 +176,15 @@ class ProjectController {
 
     } catch (error) {
       console.error('Error obteniendo proyecto:', error);
+      
+      // Manejar errores específicos
+      if (error.name === 'NotFoundError') {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -275,6 +284,22 @@ class ProjectController {
 
     } catch (error) {
       console.error('Error actualizando proyecto:', error);
+      
+      // Manejar errores específicos
+      if (error.name === 'NotFoundError') {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      if (error.message.includes('Ya existe un proyecto')) {
+        return res.status(409).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -315,6 +340,22 @@ class ProjectController {
 
     } catch (error) {
       console.error('Error eliminando proyecto:', error);
+      
+      // Manejar errores específicos
+      if (error.statusCode === 400) {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      if (error.name === 'NotFoundError') {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -849,10 +890,11 @@ class ProjectController {
 
       console.log('🔍 [CONTROLLER] getMyProjects - Llamando a projectService.getUserProjects');
       
-      const result = await this.projectService.getUserProjects(userId, {
-        page: parseInt(page),
-        limit: parseInt(limit)
-      });
+      const result = await this.projectService.getUserProjects(
+        userId, 
+        parseInt(page) || 1, 
+        parseInt(limit) || 10
+      );
 
       console.log('🔍 [CONTROLLER] getMyProjects - Resultado:', result);
 

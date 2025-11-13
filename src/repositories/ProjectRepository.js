@@ -523,16 +523,20 @@ class ProjectRepository extends BaseRepository {
    */
   async findByResponsible(userId, limit = 10, offset = 0) {
       try {
+          const numericUserId = parseInt(userId, 10);
+          const numericLimit = parseInt(limit, 10);
+          const numericOffset = parseInt(offset, 10);
+          
           const query = `
               SELECT DISTINCT p.*
               FROM proyectos p
               INNER JOIN proyecto_responsables pr ON p.id = pr.proyecto_id
               WHERE pr.usuario_id = ? AND pr.activo = 1
               ORDER BY p.created_at DESC
-              LIMIT ? OFFSET ?
+              LIMIT ${numericLimit} OFFSET ${numericOffset}
           `;
           
-          const result = await this.raw(query, [userId, limit, offset]);
+          const result = await this.raw(query, [numericUserId]);
           
           return result;
       } catch (error) {

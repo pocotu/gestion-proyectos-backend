@@ -2,24 +2,17 @@ const { pool } = require('../config/db');
 
 class LogActivityModel {
   static async createTable() {
+    // Usar la estructura existente de la base de datos
     const sql = `
       CREATE TABLE IF NOT EXISTS logs_actividad (
         id INT AUTO_INCREMENT PRIMARY KEY,
         usuario_id INT,
         accion VARCHAR(100) NOT NULL,
         entidad_tipo VARCHAR(50) NOT NULL,
-        entidad_id INT,
+        entidad_id INT NOT NULL,
         descripcion TEXT,
-        datos_anteriores JSON,
-        datos_nuevos JSON,
-        ip_address VARCHAR(45),
-        user_agent TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL,
-        INDEX idx_usuario_id (usuario_id),
-        INDEX idx_entidad (entidad_tipo, entidad_id),
-        INDEX idx_accion (accion),
-        INDEX idx_created_at (created_at)
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `;
     await pool.query(sql);
@@ -36,11 +29,26 @@ class LogActivityModel {
     ip_address = null,
     user_agent = null
   }) {
+    // Adaptar a la estructura actual de la base de datos (sin columnas extras)
+    // Incluir información adicional en la descripción si es necesario
+    let fullDescription = descripcion || '';
+    
+    if (datos_anteriores || datos_nuevos || ip_address || user_agent) {
+      const additionalInfo = [];
+      if (ip_address) additionalInfo.push(`IP: ${ip_address}`);
+      if (user_agent) additionalInfo.push(`User-Agent: ${user_agent.substring(0, 50)}`);
+      if (datos_anteriores) additionalInfo.push(`Datos anteriores: ${JSON.stringify(datos_anteriores).substring(0, 100)}`);
+      if (datos_nuevos) additionalInfo.push(`Datos nuevos: ${JSON.stringify(datos_nuevos).substring(0, 100)}`);
+      
+      if (additionalInfo.length > 0) {
+        fullDescription += ` [${additionalInfo.join(' | ')}]`;
+      }
+    }
+    
     const sql = `
       INSERT INTO logs_actividad (
-        usuario_id, accion, entidad_tipo, entidad_id, descripcion,
-        datos_anteriores, datos_nuevos, ip_address, user_agent
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        usuario_id, accion, entidad_tipo, entidad_id, descripcion
+      ) VALUES (?, ?, ?, ?, ?)
     `;
     
     const [result] = await pool.execute(sql, [
@@ -48,11 +56,7 @@ class LogActivityModel {
       accion,
       entidad_tipo,
       entidad_id,
-      descripcion,
-      datos_anteriores ? JSON.stringify(datos_anteriores) : null,
-      datos_nuevos ? JSON.stringify(datos_nuevos) : null,
-      ip_address,
-      user_agent
+      fullDescription
     ]);
     
     return { id: result.insertId };
@@ -68,11 +72,7 @@ class LogActivityModel {
       LIMIT ? OFFSET ?
     `;
     const [rows] = await pool.execute(sql, [usuario_id, limit, offset]);
-    return rows.map(row => ({
-      ...row,
-      datos_anteriores: row.datos_anteriores ? JSON.parse(row.datos_anteriores) : null,
-      datos_nuevos: row.datos_nuevos ? JSON.parse(row.datos_nuevos) : null
-    }));
+    return rows;
   }
 
   static async getByEntity(entidad_tipo, entidad_id, limit = 50, offset = 0) {
@@ -85,11 +85,7 @@ class LogActivityModel {
       LIMIT ? OFFSET ?
     `;
     const [rows] = await pool.execute(sql, [entidad_tipo, entidad_id, limit, offset]);
-    return rows.map(row => ({
-      ...row,
-      datos_anteriores: row.datos_anteriores ? JSON.parse(row.datos_anteriores) : null,
-      datos_nuevos: row.datos_nuevos ? JSON.parse(row.datos_nuevos) : null
-    }));
+    return rows;
   }
 
   static async getRecent(limit = 100, offset = 0) {
@@ -101,11 +97,7 @@ class LogActivityModel {
       LIMIT ? OFFSET ?
     `;
     const [rows] = await pool.execute(sql, [limit, offset]);
-    return rows.map(row => ({
-      ...row,
-      datos_anteriores: row.datos_anteriores ? JSON.parse(row.datos_anteriores) : null,
-      datos_nuevos: row.datos_nuevos ? JSON.parse(row.datos_nuevos) : null
-    }));
+    return rows;
   }
 
   static async getByDateRange(startDate, endDate, limit = 100, offset = 0) {
@@ -118,11 +110,7 @@ class LogActivityModel {
       LIMIT ? OFFSET ?
     `;
     const [rows] = await pool.execute(sql, [startDate, endDate, limit, offset]);
-    return rows.map(row => ({
-      ...row,
-      datos_anteriores: row.datos_anteriores ? JSON.parse(row.datos_anteriores) : null,
-      datos_nuevos: row.datos_nuevos ? JSON.parse(row.datos_nuevos) : null
-    }));
+    return rows;
   }
 
   static async getByAction(accion, limit = 50, offset = 0) {
@@ -135,11 +123,7 @@ class LogActivityModel {
       LIMIT ? OFFSET ?
     `;
     const [rows] = await pool.execute(sql, [accion, limit, offset]);
-    return rows.map(row => ({
-      ...row,
-      datos_anteriores: row.datos_anteriores ? JSON.parse(row.datos_anteriores) : null,
-      datos_nuevos: row.datos_nuevos ? JSON.parse(row.datos_nuevos) : null
-    }));
+    return rows;
   }
 
   static async getStats(dias = 30) {

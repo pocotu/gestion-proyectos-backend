@@ -292,7 +292,7 @@ class RoleController {
         data: {
           roles: roles.map(role => ({
             id: role.id,
-            name: role.nombre
+            nombre: role.nombre
           })),
           count: roles.length
         }

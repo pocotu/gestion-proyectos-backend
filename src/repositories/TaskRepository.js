@@ -178,9 +178,8 @@ class TaskRepository extends BaseRepository {
       .leftJoin('usuarios as creador', 'tareas.creado_por', 'creador.id')
       .where('tareas.proyecto_id', proyecto_id);
 
-    if (!includeSubtasks) {
-      query = query.whereNull('tareas.padre_tarea_id');
-    }
+    // Note: padre_tarea_id column doesn't exist in current schema
+    // Subtasks functionality is not implemented yet
 
     return await query
       .orderBy('tareas.prioridad', 'DESC')

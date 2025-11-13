@@ -317,20 +317,35 @@ class UserController {
     
     try {
       const { id: userId } = req.params;
-      const { roleId } = req.body;
+      const { roleId, roleName } = req.body;
 
-      console.log('🎯 [USER-CONTROLLER] assignRole - userId:', userId, 'roleId:', roleId);
+      console.log('🎯 [USER-CONTROLLER] assignRole - userId:', userId, 'roleId:', roleId, 'roleName:', roleName);
 
-      if (!userId || !roleId) {
+      if (!userId || (!roleId && !roleName)) {
         console.log('🎯 [USER-CONTROLLER] assignRole - Faltan parámetros');
         return res.status(400).json({
           success: false,
-          message: 'Se requieren userId y roleId'
+          message: 'Se requieren userId y (roleId o roleName)'
         });
       }
 
+      // Si se proporciona roleName, buscar el roleId
+      let finalRoleId = roleId;
+      if (!finalRoleId && roleName) {
+        console.log('🎯 [USER-CONTROLLER] assignRole - Buscando roleId por nombre:', roleName);
+        const role = await this.roleService.getRoleByName(roleName);
+        if (!role) {
+          return res.status(400).json({
+            success: false,
+            message: `Rol '${roleName}' no es válido o no existe`
+          });
+        }
+        finalRoleId = role.id;
+        console.log('🎯 [USER-CONTROLLER] assignRole - roleId encontrado:', finalRoleId);
+      }
+
       console.log('🎯 [USER-CONTROLLER] assignRole - Llamando al servicio');
-      const result = await this.userService.assignRoleToUser(userId, roleId, req.user.id);
+      const result = await this.userService.assignRoleToUser(userId, finalRoleId, req.user.id);
       console.log('🎯 [USER-CONTROLLER] assignRole - Resultado del servicio:', result);
 
       res.status(200).json({
