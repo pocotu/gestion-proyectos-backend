@@ -20,6 +20,7 @@ const taskRoutes = require('./routes/taskRoutes');
 const fileRoutes = require('./routes/fileRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const activityRoutes = require('./routes/activityRoutes');
+const logsRoutes = require('./routes/logsRoutes');
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/logs', logsRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

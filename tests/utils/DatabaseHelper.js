@@ -213,10 +213,15 @@ class DatabaseHelper {
   /**
    * Crea una tarea de prueba
    */
-  async createTestTask(taskData = {}, projectId = null, assignedUserId = null) {
+  async createTestTask(taskData = {}) {
+    let projectId = taskData.proyecto_id;
+    let assignedUserId = taskData.usuario_asignado_id;
+    let createdBy = taskData.creado_por;
+
     if (!projectId) {
       const testProject = await this.createTestProject();
       projectId = testProject.id;
+      createdBy = createdBy || testProject.creado_por;
     }
 
     if (!assignedUserId) {
@@ -224,28 +229,36 @@ class DatabaseHelper {
       assignedUserId = testUser.id;
     }
 
+    if (!createdBy) {
+      createdBy = assignedUserId;
+    }
+
     const defaultTask = {
       titulo: 'Tarea Test',
       descripcion: 'Descripción de la tarea de prueba',
       proyecto_id: projectId,
       usuario_asignado_id: assignedUserId,
+      creado_por: createdBy,
       estado: 'pendiente',
       prioridad: 'media',
-      fecha_vencimiento: '2024-06-30',
+      fecha_inicio: '2024-01-01',
+      fecha_fin: '2024-06-30',
       ...taskData
     };
 
     const [result] = await this.connection.execute(
-      `INSERT INTO tareas (titulo, descripcion, proyecto_id, usuario_asignado_id, estado, prioridad, fecha_vencimiento) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tareas (titulo, descripcion, proyecto_id, usuario_asignado_id, creado_por, estado, prioridad, fecha_inicio, fecha_fin) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         defaultTask.titulo,
         defaultTask.descripcion,
         defaultTask.proyecto_id,
         defaultTask.usuario_asignado_id,
+        defaultTask.creado_por,
         defaultTask.estado,
         defaultTask.prioridad,
-        defaultTask.fecha_vencimiento
+        defaultTask.fecha_inicio,
+        defaultTask.fecha_fin
       ]
     );
 
@@ -253,6 +266,70 @@ class DatabaseHelper {
       id: result.insertId,
       ...defaultTask
     };
+  }
+
+  /**
+   * Crea logs de actividad de prueba
+   * @param {Array} logs - Array de objetos con datos de logs
+   */
+  async createTestLogs(logs = []) {
+    const createdLogs = [];
+
+    for (const logData of logs) {
+      const defaultLog = {
+        usuario_id: null,
+        accion: 'crear',
+        entidad_tipo: 'proyecto',
+        entidad_id: 1,
+        descripcion: 'Log de prueba',
+        ...logData
+      };
+
+      const [result] = await this.connection.execute(
+        `INSERT INTO logs_actividad 
+         (usuario_id, accion, entidad_tipo, entidad_id, descripcion, created_at) 
+         VALUES (?, ?, ?, ?, ?, NOW())`,
+        [
+          defaultLog.usuario_id,
+          defaultLog.accion,
+          defaultLog.entidad_tipo,
+          defaultLog.entidad_id,
+          defaultLog.descripcion
+        ]
+      );
+
+      createdLogs.push({
+        id: result.insertId,
+        ...defaultLog
+      });
+    }
+
+    return createdLogs;
+  }
+
+  /**
+   * Asigna un responsable a un proyecto
+   * @param {number} projectId - ID del proyecto
+   * @param {number} userId - ID del usuario
+   */
+  async assignProjectResponsible(projectId, userId) {
+    const [result] = await this.connection.execute(
+      `INSERT INTO proyecto_responsables (proyecto_id, usuario_id) VALUES (?, ?)`,
+      [projectId, userId]
+    );
+    return result.insertId;
+  }
+
+  /**
+   * Asigna un usuario a una tarea
+   * @param {number} taskId - ID de la tarea
+   * @param {number} userId - ID del usuario
+   */
+  async assignTaskToUser(taskId, userId) {
+    await this.connection.execute(
+      `UPDATE tareas SET usuario_asignado_id = ? WHERE id = ?`,
+      [userId, taskId]
+    );
   }
 
   /**

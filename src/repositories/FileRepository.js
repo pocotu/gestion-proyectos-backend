@@ -38,17 +38,37 @@ class FileRepository extends BaseRepository {
       throw new Error('El archivo debe estar asociado a un proyecto o a una tarea');
     }
 
-    return await this.insert({
-      proyecto_id,
-      tarea_id,
+    // Determinar tabla correcta según tipo de archivo
+    const table = proyecto_id ? 'archivos_proyecto' : 'archivos_tarea';
+    const idField = proyecto_id ? 'proyecto_id' : 'tarea_id';
+    const idValue = proyecto_id || tarea_id;
+
+    // Construir objeto de datos para insertar
+    const insertData = {
+      [idField]: idValue,
       nombre_archivo,
       nombre_original,
       tipo,
-      tamano_bytes,
+      tamaño_bytes: tamano_bytes,
       ruta_archivo,
       subido_por,
       created_at: new Date()
-    });
+    };
+
+    // Usar raw SQL porque necesitamos insertar en tabla dinámica
+    const columns = Object.keys(insertData).filter(k => insertData[k] !== undefined && insertData[k] !== null);
+    const placeholders = columns.map(() => '?').join(', ');
+    const values = columns.map(k => insertData[k]);
+    
+    const sql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
+    // Para INSERT necesitamos usar el pool directamente para obtener insertId
+    const { pool } = require('../config/db');
+    const [result] = await pool.execute(sql, values);
+    
+    return {
+      id: result.insertId,
+      ...insertData
+    };
   }
 
   /**

@@ -347,7 +347,7 @@ class GranularAccessMiddleware {
     return async (req, res, next) => {
       try {
         const userId = req.user?.id;
-        const projectId = req.params.projectId;
+        const projectId = req.params.projectId || req.params.id;
 
         if (!userId) {
           return res.status(401).json({
@@ -370,7 +370,7 @@ class GranularAccessMiddleware {
         }
 
         // Verificar si es responsable del proyecto
-        const isProjectResponsible = await this.projectResponsibleRepository.isUserResponsible(userId, parseInt(projectId));
+        const isProjectResponsible = await this.projectResponsibleRepository.isUserResponsible(parseInt(projectId), userId);
         
         if (!isProjectResponsible) {
           return res.status(403).json({

@@ -222,6 +222,18 @@ router.get('/:id/files',
   projectController.getProjectFiles.bind(projectController)
 );
 
+// Subir archivos al proyecto
+// POST /api/projects/:id/files
+// Permisos: Admin o Responsable del proyecto
+const FileController = require('../controllers/fileController');
+const { requireProjectFileAccess } = require('../middleware/granularAccessMiddleware');
+const fileController = new FileController();
+
+router.post('/:id/files',
+  requireProjectFileAccess(),
+  fileController.uploadProjectFile.bind(fileController)
+);
+
 /**
  * Rutas de timeline y actividad
  */

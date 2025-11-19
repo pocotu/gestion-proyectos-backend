@@ -76,6 +76,164 @@ class FileController {
   }
 
   /**
+   * Subir archivo a un proyecto
+   * POST /api/projects/:id/files
+   * Permisos: Admin o Responsable del proyecto
+   */
+  async uploadProjectFile(req, res) {
+    try {
+      const projectId = parseInt(req.params.id);
+      const userId = req.user.id;
+
+      // Verificar que el proyecto existe
+      const ProjectRepository = require('../repositories/ProjectRepository');
+      const projectRepository = new ProjectRepository();
+      const project = await projectRepository.findById(projectId);
+      
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: 'Proyecto no encontrado'
+        });
+      }
+
+      // Configurar almacenamiento específico para archivos de proyecto
+      const path = require('path');
+      const fs = require('fs').promises;
+      const multer = require('multer');
+      
+      const projectStorage = multer.diskStorage({
+        destination: async (req, file, cb) => {
+          const uploadPath = path.join(process.cwd(), 'uploads', 'projects');
+          try {
+            await fs.mkdir(uploadPath, { recursive: true });
+            cb(null, uploadPath);
+          } catch (error) {
+            cb(error);
+          }
+        },
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+          const extension = path.extname(file.originalname);
+          const baseName = path.basename(file.originalname, extension);
+          cb(null, `${baseName}-${uniqueSuffix}${extension}`);
+        }
+      });
+
+      const fileFilter = (req, file, cb) => {
+        const allowedTypes = config.ALLOWED_MIME_TYPES || [
+          'image/jpeg', 'image/png', 'image/gif',
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'text/plain', 'text/csv',
+          'application/zip', 'application/x-rar-compressed'
+        ];
+
+        if (allowedTypes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(new Error('Tipo de archivo no permitido'), false);
+        }
+      };
+
+      const projectUpload = multer({
+        storage: projectStorage,
+        limits: {
+          fileSize: config.MAX_FILE_SIZE,
+          files: 5
+        },
+        fileFilter: fileFilter
+      });
+
+      // Usar multer middleware para archivos de proyecto
+      projectUpload.array('files', 5)(req, res, async (err) => {
+        if (err) {
+          if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+              return res.status(400).json({
+                success: false,
+                message: `El archivo es demasiado grande (máximo ${Math.round(config.MAX_FILE_SIZE / (1024 * 1024))}MB)`
+              });
+            }
+            if (err.code === 'LIMIT_FILE_COUNT') {
+              return res.status(400).json({
+                success: false,
+                message: 'Demasiados archivos (máximo 5)'
+              });
+            }
+          }
+          return res.status(400).json({
+            success: false,
+            message: err.message || 'Error al subir archivo'
+          });
+        }
+
+        if (!req.files || req.files.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'No se proporcionaron archivos'
+          });
+        }
+
+        try {
+          const uploadedFiles = [];
+          const FileRepository = require('../repositories/FileRepository');
+          const fileRepository = new FileRepository();
+
+          for (const file of req.files) {
+            const fileData = {
+              nombre_original: file.originalname,
+              nombre_archivo: file.filename,
+              ruta_archivo: file.path,
+              tipo_mime: file.mimetype,
+              tamano_bytes: file.size,
+              proyecto_id: projectId,
+              tarea_id: null,
+              subido_por: userId
+            };
+
+            const savedFile = await fileRepository.createFile(fileData);
+            uploadedFiles.push(savedFile);
+          }
+
+          res.status(201).json({
+            success: true,
+            message: `${uploadedFiles.length} archivo(s) subido(s) exitosamente al proyecto`,
+            data: { files: uploadedFiles }
+          });
+
+        } catch (error) {
+          console.error('Error guardando archivos del proyecto:', error);
+          
+          // Limpiar archivos subidos en caso de error
+          for (const file of req.files) {
+            try {
+              await fs.unlink(file.path);
+            } catch (unlinkError) {
+              console.error('Error eliminando archivo:', unlinkError);
+            }
+          }
+
+          res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor'
+          });
+        }
+      });
+
+    } catch (error) {
+      console.error('Error en upload de archivo de proyecto:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  /**
    * Subir archivo a una tarea
    * POST /api/files/upload/:taskId
    * Permisos: Admin, Responsable del proyecto, o usuario asignado a la tarea
@@ -84,22 +242,13 @@ class FileController {
     try {
       const taskId = parseInt(req.params.taskId);
       const userId = req.user.id;
-      const isAdmin = req.user.es_administrador;
 
-      // Verificar permisos sobre la tarea
-      if (!isAdmin) {
-        const hasAccess = await this.fileService.userHasAccessToTask(userId, taskId);
-        if (!hasAccess) {
-          return res.status(403).json({
-            success: false,
-            message: 'No tienes acceso a esta tarea'
-          });
-        }
-      }
-
-      // Verificar que la tarea existe
-      const taskExists = await this.fileService.taskExists(taskId);
-      if (!taskExists) {
+      // Verificar que la tarea existe usando TaskRepository
+      const TaskRepository = require('../repositories/TaskRepository');
+      const taskRepository = new TaskRepository();
+      const task = await taskRepository.findById(taskId);
+      
+      if (!task) {
         return res.status(404).json({
           success: false,
           message: 'Tarea no encontrada'
@@ -138,6 +287,8 @@ class FileController {
 
         try {
           const uploadedFiles = [];
+          const FileRepository = require('../repositories/FileRepository');
+          const fileRepository = new FileRepository();
 
           for (const file of req.files) {
             const fileData = {
@@ -145,12 +296,13 @@ class FileController {
               nombre_archivo: file.filename,
               ruta_archivo: file.path,
               tipo_mime: file.mimetype,
-              tamaño: file.size,
+              tamano_bytes: file.size,
+              proyecto_id: null,
               tarea_id: taskId,
               subido_por: userId
             };
 
-            const savedFile = await this.fileService.saveFile(fileData);
+            const savedFile = await fileRepository.createFile(fileData);
             uploadedFiles.push(savedFile);
           }
 
@@ -196,21 +348,12 @@ class FileController {
   async getTaskFiles(req, res) {
     try {
       const taskId = parseInt(req.params.taskId);
-      const userId = req.user.id;
-      const isAdmin = req.user.es_administrador;
 
-      // Verificar permisos sobre la tarea
-      if (!isAdmin) {
-        const hasAccess = await this.fileService.userHasAccessToTask(userId, taskId);
-        if (!hasAccess) {
-          return res.status(403).json({
-            success: false,
-            message: 'No tienes acceso a esta tarea'
-          });
-        }
-      }
-
-      const files = await this.fileService.getFilesByTask(taskId);
+      // El middleware ya verificó los permisos
+      const FileRepository = require('../repositories/FileRepository');
+      const fileRepository = new FileRepository();
+      
+      const files = await fileRepository.findByTask(taskId);
 
       res.json({
         success: true,

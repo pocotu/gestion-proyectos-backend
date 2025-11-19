@@ -46,6 +46,79 @@ router.get('/task/:taskId',
   fileController.getTaskFiles.bind(fileController)
 );
 
+/**
+ * Rutas de validación y utilidades (ANTES de rutas dinámicas)
+ */
+
+// Validar archivo antes de subir
+// POST /api/files/validate
+// Permisos: Usuario autenticado
+router.post('/validate', 
+  (req, res) => {
+    const { filename, size, mimetype } = req.body;
+    
+    if (!filename || !size || !mimetype) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faltan datos del archivo para validar'
+      });
+    }
+
+    // Validaciones básicas
+    const maxSize = config.MAX_FILE_SIZE;
+    const allowedTypes = config.ALLOWED_MIME_TYPES;
+
+    const errors = [];
+
+    if (size > maxSize) {
+      errors.push('El archivo es demasiado grande (máximo 10MB)');
+    }
+
+    if (!allowedTypes.includes(mimetype)) {
+      errors.push('Tipo de archivo no permitido');
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Archivo no válido',
+        errors
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Archivo válido para subir'
+    });
+  }
+);
+
+// Obtener tipos de archivo permitidos
+// GET /api/files/allowed-types
+// Permisos: Usuario autenticado
+router.get('/allowed-types', 
+  (req, res) => {
+    const allowedTypes = {
+      images: ['image/jpeg', 'image/png', 'image/gif'],
+      documents: [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain',
+        'text/csv'
+      ],
+      archives: ['application/zip', 'application/x-rar-compressed']
+    };
+
+    res.json({
+      success: true,
+      data: { allowedTypes }
+    });
+  }
+);
+
 // Descargar archivo
 // GET /api/files/download/:fileId
 // Permisos: Solo quien subió el archivo, responsables del proyecto y admin
@@ -192,79 +265,6 @@ router.delete('/admin/cleanup-orphans',
     res.json({
       success: true,
       message: 'Funcionalidad de limpieza de archivos huérfanos en desarrollo'
-    });
-  }
-);
-
-/**
- * Rutas de validación y utilidades
- */
-
-// Validar archivo antes de subir
-// POST /api/files/validate
-// Permisos: Usuario autenticado
-router.post('/validate', 
-  (req, res) => {
-    const { filename, size, mimetype } = req.body;
-    
-    if (!filename || !size || !mimetype) {
-      return res.status(400).json({
-        success: false,
-        message: 'Faltan datos del archivo para validar'
-      });
-    }
-
-    // Validaciones básicas
-    const maxSize = config.MAX_FILE_SIZE;
-    const allowedTypes = config.ALLOWED_MIME_TYPES;
-
-    const errors = [];
-
-    if (size > maxSize) {
-      errors.push('El archivo es demasiado grande (máximo 10MB)');
-    }
-
-    if (!allowedTypes.includes(mimetype)) {
-      errors.push('Tipo de archivo no permitido');
-    }
-
-    if (errors.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Archivo no válido',
-        errors
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Archivo válido para subir'
-    });
-  }
-);
-
-// Obtener tipos de archivo permitidos
-// GET /api/files/allowed-types
-// Permisos: Usuario autenticado
-router.get('/allowed-types', 
-  (req, res) => {
-    const allowedTypes = {
-      images: ['image/jpeg', 'image/png', 'image/gif'],
-      documents: [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'text/plain',
-        'text/csv'
-      ],
-      archives: ['application/zip', 'application/x-rar-compressed']
-    };
-
-    res.json({
-      success: true,
-      data: { allowedTypes }
     });
   }
 );

@@ -23,11 +23,8 @@ class LogActivityRepository extends BaseRepository {
       accion,
       entidad_tipo,
       entidad_id = null,
-      descripcion = null,
-      datos_anteriores = null,
-      datos_nuevos = null,
-      ip_address = null,
-      user_agent = null
+      descripcion = null
+      // Nota: datos_anteriores, datos_nuevos, ip_address y user_agent no están en la tabla actual (MVP)
     } = activityData;
 
     // Validar acciones válidas
@@ -48,9 +45,6 @@ class LogActivityRepository extends BaseRepository {
       entidad_tipo,
       entidad_id,
       descripcion,
-      datos_anteriores: datos_anteriores ? JSON.stringify(datos_anteriores) : null,
-      datos_nuevos: datos_nuevos ? JSON.stringify(datos_nuevos) : null,
-      ip_address,
       user_agent,
       created_at: new Date()
     });
@@ -83,19 +77,20 @@ class LogActivityRepository extends BaseRepository {
    * Obtiene actividades por entidad específica
    */
   async getByEntity(entidad_tipo, entidad_id, limit = 50, offset = 0) {
-    return await this
-      .select(`
+    const sanitizedLimit = Math.max(1, Math.min(parseInt(limit) || 50, 100));
+    const sanitizedOffset = Math.max(0, parseInt(offset) || 0);
+    
+    return await this.raw(`
+      SELECT 
         logs_actividad.*,
         usuarios.nombre as usuario_nombre,
         usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
-      .where('logs_actividad.entidad_tipo', entidad_tipo)
-      .where('logs_actividad.entidad_id', entidad_id)
-      .orderBy('logs_actividad.created_at', 'DESC')
-      .limit(limit)
-      .offset(offset)
-      .get();
+      FROM logs_actividad
+      LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
+      WHERE logs_actividad.entidad_tipo = ? AND logs_actividad.entidad_id = ?
+      ORDER BY logs_actividad.created_at DESC
+      LIMIT ${sanitizedOffset}, ${sanitizedLimit}
+    `, [entidad_tipo, entidad_id]);
   }
 
   /**
@@ -111,8 +106,7 @@ class LogActivityRepository extends BaseRepository {
       .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
       .where('logs_actividad.accion', accion)
       .orderBy('logs_actividad.created_at', 'DESC')
-      .limit(limit)
-      .offset(offset)
+      .limit(limit, offset)
       .get();
   }
 
@@ -127,10 +121,9 @@ class LogActivityRepository extends BaseRepository {
         usuarios.email as usuario_email
       `)
       .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
-      .whereBetween('logs_actividad.created_at', [fecha_inicio, fecha_fin])
+      .whereBetween('logs_actividad.created_at', fecha_inicio, fecha_fin)
       .orderBy('logs_actividad.created_at', 'DESC')
-      .limit(limit)
-      .offset(offset)
+      .limit(limit, offset)
       .get();
   }
 
@@ -138,23 +131,26 @@ class LogActivityRepository extends BaseRepository {
    * Obtiene actividades recientes del sistema
    */
   async getRecentActivities(limit = 20) {
-    return await this
-      .select(`
+    // Validar y sanitizar limit para evitar SQL injection
+    const sanitizedLimit = Math.max(1, Math.min(parseInt(limit) || 20, 1000));
+    
+    return await this.raw(`
+      SELECT 
         logs_actividad.*,
         usuarios.nombre as usuario_nombre,
         usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
-      .orderBy('logs_actividad.created_at', 'DESC')
-      .limit(limit)
-      .get();
+      FROM logs_actividad
+      LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
+      ORDER BY logs_actividad.created_at DESC
+      LIMIT ${sanitizedLimit}
+    `, []);
   }
 
   /**
    * Obtiene estadísticas de actividad por usuario
    */
   async getUserActivityStats(usuario_id) {
-    const stats = await this.execute(`
+    const stats = await this.raw(`
       SELECT 
         accion,
         COUNT(*) as total,
@@ -165,13 +161,13 @@ class LogActivityRepository extends BaseRepository {
       ORDER BY fecha DESC
     `, [usuario_id]);
 
-    const totalActivities = await this.execute(`
+    const totalActivities = await this.raw(`
       SELECT COUNT(*) as total
       FROM logs_actividad
       WHERE usuario_id = ?
     `, [usuario_id]);
 
-    const recentActivities = await this.execute(`
+    const recentActivities = await this.raw(`
       SELECT COUNT(*) as total
       FROM logs_actividad
       WHERE usuario_id = ? 
@@ -189,19 +185,20 @@ class LogActivityRepository extends BaseRepository {
    * Obtiene el historial de cambios de una entidad específica
    */
   async getEntityHistory(entidad_tipo, entidad_id, limit = 50, offset = 0) {
-    return await this
-      .select(`
+    const sanitizedLimit = Math.max(1, Math.min(parseInt(limit) || 50, 100));
+    const sanitizedOffset = Math.max(0, parseInt(offset) || 0);
+    
+    return await this.raw(`
+      SELECT 
         logs_actividad.*,
         usuarios.nombre as usuario_nombre,
         usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
-      .where('logs_actividad.entidad_tipo', entidad_tipo)
-      .where('logs_actividad.entidad_id', entidad_id)
-      .orderBy('logs_actividad.created_at', 'ASC')
-      .limit(limit)
-      .offset(offset)
-      .get();
+      FROM logs_actividad
+      LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
+      WHERE logs_actividad.entidad_tipo = ? AND logs_actividad.entidad_id = ?
+      ORDER BY logs_actividad.created_at ASC
+      LIMIT ${sanitizedOffset}, ${sanitizedLimit}
+    `, [entidad_tipo, entidad_id]);
   }
 
   /**
@@ -217,8 +214,7 @@ class LogActivityRepository extends BaseRepository {
       .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
       .where('logs_actividad.descripcion', 'LIKE', `%${searchTerm}%`)
       .orderBy('logs_actividad.created_at', 'DESC')
-      .limit(limit)
-      .offset(offset)
+      .limit(limit, offset)
       .get();
   }
 
@@ -235,8 +231,7 @@ class LogActivityRepository extends BaseRepository {
       .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
       .where('logs_actividad.ip_address', ip_address)
       .orderBy('logs_actividad.created_at', 'DESC')
-      .limit(limit)
-      .offset(offset)
+      .limit(limit, offset)
       .get();
   }
 
@@ -244,12 +239,12 @@ class LogActivityRepository extends BaseRepository {
    * Obtiene resumen de actividades del sistema
    */
   async getActivitySummary() {
-    const totalActivities = await this.execute(`
+    const totalActivities = await this.raw(`
       SELECT COUNT(*) as total
       FROM logs_actividad
     `);
 
-    const activitiesByAction = await this.execute(`
+    const activitiesByAction = await this.raw(`
       SELECT 
         accion,
         COUNT(*) as total
@@ -258,7 +253,7 @@ class LogActivityRepository extends BaseRepository {
       ORDER BY total DESC
     `);
 
-    const activitiesByEntity = await this.execute(`
+    const activitiesByEntity = await this.raw(`
       SELECT 
         entidad_tipo,
         COUNT(*) as total
@@ -267,13 +262,13 @@ class LogActivityRepository extends BaseRepository {
       ORDER BY total DESC
     `);
 
-    const recentActivities = await this.execute(`
+    const recentActivities = await this.raw(`
       SELECT COUNT(*) as total
       FROM logs_actividad
       WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
     `);
 
-    const topUsers = await this.execute(`
+    const topUsers = await this.raw(`
       SELECT 
         u.nombre,
         u.email,
@@ -285,7 +280,7 @@ class LogActivityRepository extends BaseRepository {
       LIMIT 10
     `);
 
-    const activitiesByHour = await this.execute(`
+    const activitiesByHour = await this.raw(`
       SELECT 
         HOUR(created_at) as hora,
         COUNT(*) as total
