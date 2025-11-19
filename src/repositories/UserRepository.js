@@ -334,16 +334,17 @@ class UserRepository extends BaseRepository {
       const limitInt = parseInt(limit, 10);
       const offsetInt = parseInt(offset, 10);
       
+      // Usar query con placeholders para LIMIT y OFFSET
       const searchQuery = `
         SELECT * FROM usuarios 
         WHERE (nombre LIKE ? OR email LIKE ?) 
         AND estado = 1
         ORDER BY nombre ASC 
-        LIMIT ? OFFSET ?
+        LIMIT ${limitInt} OFFSET ${offsetInt}
       `;
       
       const searchPattern = `%${query}%`;
-      const [rows] = await pool.execute(searchQuery, [searchPattern, searchPattern, limitInt, offsetInt]);
+      const [rows] = await pool.execute(searchQuery, [searchPattern, searchPattern]);
       
       return rows;
     } catch (error) {

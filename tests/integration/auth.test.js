@@ -211,4 +211,242 @@ describe('Auth Integration Tests - MVP', () => {
       logger.success('Validación de autorización funcionando');
     });
   });
+
+  describe('POST /api/auth/logout', () => {
+    test('Debe cerrar sesión exitosamente', async () => {
+      logger.info('Test: Logout exitoso');
+      
+      const userData = {
+        nombre: 'Logout User',
+        email: 'logout@example.com',
+        contraseña: 'password123',
+        telefono: '1234567890'
+      };
+      
+      // Crear y autenticar usuario
+      const registerResponse = await request(app)
+        .post('/api/auth/register')
+        .send(userData);
+
+      const token = registerResponse.body.token;
+
+      const response = await request(app)
+        .post('/api/auth/logout')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        message: 'Logout exitoso'
+      });
+      
+      logger.success('Logout funcionando correctamente');
+    });
+
+    test('Debe fallar logout sin token', async () => {
+      const response = await request(app)
+        .post('/api/auth/logout')
+        .expect(401);
+
+      expect(response.body.success).toBe(false);
+      
+      logger.success('Validación de token en logout funcionando');
+    });
+  });
+
+  describe('POST /api/auth/logout-all', () => {
+    test('Debe cerrar todas las sesiones exitosamente', async () => {
+      logger.info('Test: Logout de todas las sesiones');
+      
+      const userData = {
+        nombre: 'Logout All User',
+        email: 'logoutall@example.com',
+        contraseña: 'password123',
+        telefono: '1234567890'
+      };
+      
+      // Crear usuario
+      const registerResponse = await request(app)
+        .post('/api/auth/register')
+        .send(userData);
+
+      const token = registerResponse.body.token;
+
+      const response = await request(app)
+        .post('/api/auth/logout-all')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        message: 'Todas las sesiones cerradas exitosamente'
+      });
+      
+      logger.success('Logout de todas las sesiones funcionando');
+    });
+  });
+
+  describe('GET /api/auth/verify', () => {
+    test('Debe verificar token válido', async () => {
+      logger.info('Test: Verificar token válido');
+      
+      const userData = {
+        nombre: 'Verify User',
+        email: 'verify@example.com',
+        contraseña: 'password123',
+        telefono: '1234567890'
+      };
+      
+      // Crear usuario
+      const registerResponse = await request(app)
+        .post('/api/auth/register')
+        .send(userData);
+
+      const token = registerResponse.body.token;
+
+      const response = await request(app)
+        .get('/api/auth/verify')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        message: 'Token válido',
+        data: {
+          user: expect.objectContaining({
+            email: userData.email
+          })
+        }
+      });
+      
+      logger.success('Verificación de token funcionando');
+    });
+
+    test('Debe fallar con token inválido', async () => {
+      const response = await request(app)
+        .get('/api/auth/verify')
+        .set('Authorization', 'Bearer token_invalido')
+        .expect(401);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('Token inválido');
+      
+      logger.success('Validación de token inválido funcionando');
+    });
+
+    test('Debe fallar sin token', async () => {
+      const response = await request(app)
+        .get('/api/auth/verify')
+        .expect(401);
+
+      expect(response.body.success).toBe(false);
+      
+      logger.success('Validación de ausencia de token funcionando');
+    });
+  });
+
+  describe('PUT /api/auth/change-password', () => {
+    test('Debe cambiar contraseña exitosamente', async () => {
+      logger.info('Test: Cambiar contraseña');
+      
+      const userData = {
+        nombre: 'Change Password User',
+        email: 'changepass@example.com',
+        contraseña: 'password123',
+        telefono: '1234567890'
+      };
+      
+      // Crear usuario
+      const registerResponse = await request(app)
+        .post('/api/auth/register')
+        .send(userData);
+
+      const token = registerResponse.body.token;
+
+      const response = await request(app)
+        .put('/api/auth/change-password')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          currentPassword: 'password123',
+          newPassword: 'newpassword456'
+        })
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        message: expect.stringContaining('Contraseña cambiada')
+      });
+
+      // Verificar que puede hacer login con la nueva contraseña
+      const loginResponse = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: userData.email,
+          contraseña: 'newpassword456'
+        })
+        .expect(200);
+
+      expect(loginResponse.body.success).toBe(true);
+      
+      logger.success('Cambio de contraseña funcionando');
+    });
+
+    test('Debe fallar con contraseña actual incorrecta', async () => {
+      const userData = {
+        nombre: 'Wrong Password User',
+        email: 'wrongpass@example.com',
+        contraseña: 'password123',
+        telefono: '1234567890'
+      };
+      
+      const registerResponse = await request(app)
+        .post('/api/auth/register')
+        .send(userData);
+
+      const token = registerResponse.body.token;
+
+      const response = await request(app)
+        .put('/api/auth/change-password')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          currentPassword: 'wrongpassword',
+          newPassword: 'newpassword456'
+        })
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('incorrecta');
+      
+      logger.success('Validación de contraseña actual funcionando');
+    });
+
+    test('Debe fallar sin datos requeridos', async () => {
+      const userData = {
+        nombre: 'Missing Data User',
+        email: 'missingdata@example.com',
+        contraseña: 'password123',
+        telefono: '1234567890'
+      };
+      
+      const registerResponse = await request(app)
+        .post('/api/auth/register')
+        .send(userData);
+
+      const token = registerResponse.body.token;
+
+      const response = await request(app)
+        .put('/api/auth/change-password')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          currentPassword: 'password123'
+          // Falta newPassword
+        })
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('requeridas');
+      
+      logger.success('Validación de datos requeridos funcionando');
+    });
+  });
 });

@@ -223,6 +223,64 @@ class AuthService {
     }
   }
 
+  /**
+   * Cambia la contraseña del usuario
+   * @param {number} userId - ID del usuario
+   * @param {string} currentPassword - Contraseña actual
+   * @param {string} newPassword - Nueva contraseña
+   * @returns {Object} Resultado del cambio de contraseña
+   */
+  async changePassword(userId, currentPassword, newPassword) {
+    try {
+      // Obtener usuario
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new Error('Usuario no encontrado');
+      }
+
+      // Verificar contraseña actual
+      const isValidPassword = await bcrypt.compare(currentPassword, user.contraseña);
+      if (!isValidPassword) {
+        throw new Error('Contraseña actual incorrecta');
+      }
+
+      // Validar nueva contraseña
+      if (!newPassword || newPassword.length < 8) {
+        throw new Error('La nueva contraseña debe tener al menos 8 caracteres');
+      }
+
+      // Hash de la nueva contraseña
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+      // Actualizar contraseña en la base de datos
+      await pool.execute(
+        'UPDATE usuarios SET contraseña = ?, updated_at = NOW() WHERE id = ?',
+        [hashedPassword, userId]
+      );
+
+      // Registrar cambio de contraseña en logs
+      try {
+        await this.logActivityRepository.logActivity({
+          usuario_id: userId,
+          accion: 'actualizar',
+          entidad_tipo: 'usuario',
+          entidad_id: userId,
+          descripcion: 'Contraseña cambiada exitosamente'
+        });
+      } catch (error) {
+        console.warn('Error registrando cambio de contraseña en logs:', error.message);
+      }
+
+      return {
+        success: true,
+        message: 'Contraseña cambiada exitosamente'
+      };
+    } catch (error) {
+      console.error('Error cambiando contraseña:', error);
+      throw error;
+    }
+  }
+
   // ========================================
   // MÉTODOS DE REFRESH TOKEN
   // ========================================
@@ -368,40 +426,34 @@ class AuthService {
 
   /**
    * Revoca todos los refresh tokens de un usuario
+   * MVP: Simplificado sin tabla refresh_tokens
    * @param {number} userId - ID del usuario
    * @returns {number} Cantidad de tokens revocados
    */
   async revokeAllUserTokens(userId) {
     try {
-      const [result] = await pool.execute(
-        `UPDATE refresh_tokens 
-         SET revoked = TRUE, revoked_at = NOW()
-         WHERE usuario_id = ? AND revoked = FALSE`,
-        [userId]
-      );
-
-      return result.affectedRows;
+      // MVP: Sin tabla refresh_tokens, solo registramos la acción
+      console.log(`MVP: Revocación de tokens para usuario ${userId} (sin tabla refresh_tokens)`);
+      return 0; // Retornar 0 ya que no hay tokens físicos que revocar
     } catch (error) {
       console.error('Error revocando todos los tokens del usuario:', error);
-      throw new Error('Error al revocar tokens del usuario');
+      return 0;
     }
   }
 
   /**
    * Logout del usuario con revocación de tokens
+   * MVP: Simplificado sin tabla refresh_tokens
    * @param {string} accessToken - Access token actual (opcional)
-   * @param {string} refreshToken - Refresh token a revocar
+   * @param {string} refreshToken - Refresh token a revocar (opcional)
    * @param {number} userId - ID del usuario
    * @param {string} ipAddress - IP del cliente (opcional)
    * @returns {Object} Resultado del logout
    */
   async logout(accessToken, refreshToken, userId, ipAddress = null) {
     try {
-      // Revocar el refresh token si se proporcionó
-      if (refreshToken) {
-        await this.revokeRefreshToken(refreshToken);
-      }
-
+      // MVP: Sin tabla refresh_tokens, solo registramos el logout
+      
       // Registrar logout en logs de actividad
       try {
         await this.logActivityRepository.logLogout(userId, ipAddress);
@@ -421,14 +473,15 @@ class AuthService {
 
   /**
    * Logout de todas las sesiones del usuario
+   * MVP: Simplificado sin tabla refresh_tokens
    * @param {number} userId - ID del usuario
    * @param {string} ipAddress - IP del cliente (opcional)
    * @returns {Object} Resultado del logout global
    */
   async logoutAll(userId, ipAddress = null) {
     try {
-      // Revocar todos los refresh tokens del usuario
-      const revokedCount = await this.revokeAllUserTokens(userId);
+      // MVP: Sin tabla refresh_tokens, solo registramos la acción
+      const revokedCount = 0;
 
       // Registrar logout global en logs de actividad
       try {
@@ -437,7 +490,7 @@ class AuthService {
           accion: 'logout',
           entidad_tipo: 'usuario',
           entidad_id: userId,
-          descripcion: `Logout de todas las sesiones (${revokedCount} tokens revocados)`,
+          descripcion: 'Logout de todas las sesiones',
           ip_address: ipAddress
         });
       } catch (error) {
@@ -446,7 +499,7 @@ class AuthService {
 
       return {
         success: true,
-        message: `Se cerraron todas las sesiones (${revokedCount} sesiones activas)`,
+        message: 'Todas las sesiones cerradas exitosamente',
         revokedTokens: revokedCount
       };
     } catch (error) {

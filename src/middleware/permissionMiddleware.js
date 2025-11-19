@@ -227,10 +227,10 @@ class PermissionMiddleware {
   /**
    * Middleware para verificar propiedad de recurso o permisos administrativos
    * @param {string} resourceType - Tipo de recurso (user, project, task, file)
-   * @param {string} ownerField - Campo que contiene el ID del propietario
+   * @param {string} action - Acción a realizar (read, update, delete)
    * @returns {Function} Middleware function
    */
-  requireOwnershipOrPermission(resourceType, ownerField = 'userId') {
+  requireOwnershipOrPermission(resourceType, action = 'read') {
     return async (req, res, next) => {
       try {
         // Verificar que el usuario esté autenticado
@@ -247,40 +247,63 @@ class PermissionMiddleware {
           return;
         }
 
-        const resourceOwnerId = parseInt(req.params[ownerField]);
+        // Obtener el ID del recurso desde req.params.id
+        const resourceId = parseInt(req.params.id);
         const currentUserId = req.user.id;
 
-        // Verificar propiedad del recurso
-        if (currentUserId === resourceOwnerId) {
+        // Para usuarios, verificar si está accediendo a su propio perfil
+        if (resourceType === 'users' && currentUserId === resourceId) {
           next();
           return;
         }
 
         // Obtener roles del usuario para verificar permisos adicionales
-        const userRoles = await this.userRoleRepository.getUserRoles(req.user.id);
+        const userRoles = await UserRoleRepository.getUserRolesStatic(req.user.id);
         const userRoleNames = userRoles.map(role => role.rol_nombre);
 
-        // Verificar permisos basados en el tipo de recurso
+        // Verificar permisos basados en el tipo de recurso y acción
         let hasPermission = false;
         switch (resourceType) {
-          case 'user':
-            hasPermission = userHasPermission(userRoleNames, PERMISSIONS.USERS.UPDATE);
+          case 'users':
+            if (action === 'read') {
+              hasPermission = userHasPermission(userRoleNames, PERMISSIONS.USERS.READ);
+            } else if (action === 'update') {
+              hasPermission = userHasPermission(userRoleNames, PERMISSIONS.USERS.UPDATE);
+            } else if (action === 'delete') {
+              hasPermission = userHasPermission(userRoleNames, PERMISSIONS.USERS.DELETE);
+            }
             break;
-          case 'project':
-            hasPermission = userHasPermission(userRoleNames, PERMISSIONS.PROJECTS.UPDATE);
+          case 'projects':
+            if (action === 'read') {
+              hasPermission = userHasPermission(userRoleNames, PERMISSIONS.PROJECTS.READ);
+            } else if (action === 'update') {
+              hasPermission = userHasPermission(userRoleNames, PERMISSIONS.PROJECTS.UPDATE);
+            } else if (action === 'delete') {
+              hasPermission = userHasPermission(userRoleNames, PERMISSIONS.PROJECTS.DELETE);
+            }
             break;
-          case 'task':
-            hasPermission = userHasPermission(userRoleNames, PERMISSIONS.TASKS.UPDATE);
+          case 'tasks':
+            if (action === 'read') {
+              hasPermission = userHasPermission(userRoleNames, PERMISSIONS.TASKS.READ);
+            } else if (action === 'update') {
+              hasPermission = userHasPermission(userRoleNames, PERMISSIONS.TASKS.UPDATE);
+            } else if (action === 'delete') {
+              hasPermission = userHasPermission(userRoleNames, PERMISSIONS.TASKS.DELETE);
+            }
             break;
-          case 'file':
-            hasPermission = userHasPermission(userRoleNames, PERMISSIONS.FILES.DELETE);
+          case 'files':
+            if (action === 'read') {
+              hasPermission = userHasPermission(userRoleNames, PERMISSIONS.FILES.READ);
+            } else if (action === 'delete') {
+              hasPermission = userHasPermission(userRoleNames, PERMISSIONS.FILES.DELETE);
+            }
             break;
         }
 
         if (!hasPermission) {
           return res.status(403).json({
             success: false,
-            message: `Acceso denegado. Solo puedes gestionar tus propios ${resourceType}s o necesitas permisos adicionales`,
+            message: `Acceso denegado. Solo puedes gestionar tus propios ${resourceType} o necesitas permisos adicionales`,
             userRoles: userRoleNames
           });
         }

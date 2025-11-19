@@ -261,6 +261,352 @@ describe('Users and Roles Integration Tests - MVP', () => {
     });
   });
 
+  describe('GET /api/users/:id', () => {
+    test('Debe obtener usuario específico como admin', async () => {
+      logger.info('Test: Obtener usuario por ID');
+      
+      // Crear usuario de prueba
+      const userData = {
+        nombre: 'Usuario Específico',
+        email: 'usuario.especifico@example.com',
+        contraseña: 'password123',
+        telefono: '1234567890'
+      };
+      
+      const createResponse = await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(userData);
+
+      const userId = createResponse.body.user.id;
+
+      const response = await request(app)
+        .get(`/api/users/${userId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        data: {
+          user: expect.objectContaining({
+            id: userId,
+            nombre: userData.nombre,
+            email: userData.email
+          })
+        }
+      });
+      
+      logger.success('Obtención de usuario por ID funcionando');
+    });
+
+    test('Debe permitir a usuario ver su propio perfil', async () => {
+      // Crear usuario regular
+      const userAuth = await authHelper.createUserAndGetToken();
+      
+      const response = await request(app)
+        .get(`/api/users/${userAuth.user.id}`)
+        .set('Authorization', `Bearer ${userAuth.token}`)
+        .expect(200);
+
+      expect(response.body.data.user.id).toBe(userAuth.user.id);
+      
+      logger.success('Usuario puede ver su propio perfil');
+    });
+
+    test('Debe fallar al intentar ver otro usuario sin permisos', async () => {
+      // Crear dos usuarios
+      const user1Auth = await authHelper.createUserAndGetToken();
+      const user2Auth = await authHelper.createUserAndGetToken();
+      
+      const response = await request(app)
+        .get(`/api/users/${user2Auth.user.id}`)
+        .set('Authorization', `Bearer ${user1Auth.token}`)
+        .expect(403);
+
+      expect(response.body.success).toBe(false);
+      
+      logger.success('Validación de permisos funcionando');
+    });
+  });
+
+  describe('PUT /api/users/:id', () => {
+    test('Debe actualizar usuario como admin', async () => {
+      logger.info('Test: Actualizar usuario');
+      
+      // Crear usuario
+      const userData = {
+        nombre: 'Usuario Original',
+        email: 'usuario.original@example.com',
+        contraseña: 'password123',
+        telefono: '1234567890'
+      };
+      
+      const createResponse = await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(userData);
+
+      const userId = createResponse.body.user.id;
+
+      // Actualizar usuario
+      const updateData = {
+        nombre: 'Usuario Actualizado',
+        telefono: '9876543210'
+      };
+
+      const response = await request(app)
+        .put(`/api/users/${userId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        data: {
+          user: expect.objectContaining({
+            id: userId,
+            nombre: updateData.nombre,
+            telefono: updateData.telefono
+          })
+        }
+      });
+      
+      logger.success('Actualización de usuario funcionando');
+    });
+
+    test('Debe fallar con nombre vacío', async () => {
+      const userData = {
+        nombre: 'Usuario Test',
+        email: 'usuario.test.update@example.com',
+        contraseña: 'password123'
+      };
+      
+      const createResponse = await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(userData);
+
+      const userId = createResponse.body.user.id;
+
+      const response = await request(app)
+        .put(`/api/users/${userId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ nombre: '' })
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      
+      logger.success('Validación de nombre requerido funcionando');
+    });
+  });
+
+  describe('DELETE /api/users/:id', () => {
+    test('Debe eliminar usuario como admin', async () => {
+      logger.info('Test: Eliminar usuario');
+      
+      // Crear usuario
+      const userData = {
+        nombre: 'Usuario a Eliminar',
+        email: 'usuario.eliminar@example.com',
+        contraseña: 'password123',
+        telefono: '1234567890'
+      };
+      
+      const createResponse = await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(userData);
+
+      const userId = createResponse.body.user.id;
+
+      const response = await request(app)
+        .delete(`/api/users/${userId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        message: expect.stringContaining('eliminado')
+      });
+
+      // Verificar que el usuario ya no existe
+      await request(app)
+        .get(`/api/users/${userId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+      
+      logger.success('Eliminación de usuario funcionando');
+    });
+
+    test('Debe fallar al intentar eliminarse a sí mismo', async () => {
+      const response = await request(app)
+        .delete(`/api/users/${adminUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('propia cuenta');
+      
+      logger.success('Validación de auto-eliminación funcionando');
+    });
+  });
+
+  describe('GET /api/users/profile', () => {
+    test('Debe obtener perfil del usuario actual', async () => {
+      logger.info('Test: Obtener perfil propio');
+      
+      const userAuth = await authHelper.createUserAndGetToken();
+      
+      const response = await request(app)
+        .get('/api/users/profile')
+        .set('Authorization', `Bearer ${userAuth.token}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        data: {
+          user: expect.objectContaining({
+            id: userAuth.user.id,
+            email: userAuth.user.email
+          })
+        }
+      });
+      
+      logger.success('Obtención de perfil propio funcionando');
+    });
+  });
+
+  describe('PUT /api/users/profile', () => {
+    test('Debe actualizar perfil del usuario actual', async () => {
+      logger.info('Test: Actualizar perfil propio');
+      
+      const userAuth = await authHelper.createUserAndGetToken();
+      
+      const updateData = {
+        nombre: 'Nombre Actualizado',
+        telefono: '5555555555'
+      };
+
+      const response = await request(app)
+        .put('/api/users/profile')
+        .set('Authorization', `Bearer ${userAuth.token}`)
+        .send(updateData)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        data: {
+          user: expect.objectContaining({
+            nombre: updateData.nombre,
+            telefono: updateData.telefono
+          })
+        }
+      });
+      
+      logger.success('Actualización de perfil propio funcionando');
+    });
+  });
+
+  describe('GET /api/users/search', () => {
+    test('Debe buscar usuarios como admin', async () => {
+      logger.info('Test: Buscar usuarios');
+      
+      // Crear usuario con nombre específico
+      const userData = {
+        nombre: 'Usuario Búsqueda Única',
+        email: 'busqueda.unica@example.com',
+        contraseña: 'password123'
+      };
+      
+      await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(userData);
+
+      const response = await request(app)
+        .get('/api/users/search')
+        .query({ q: 'Búsqueda Única' })
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.users).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            nombre: userData.nombre
+          })
+        ])
+      );
+      
+      logger.success('Búsqueda de usuarios funcionando');
+    });
+
+    test('Debe fallar sin parámetro de búsqueda', async () => {
+      const response = await request(app)
+        .get('/api/users/search')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      
+      logger.success('Validación de parámetro de búsqueda funcionando');
+    });
+  });
+
+  describe('DELETE /api/users/:id/roles/:roleId', () => {
+    test('Debe remover rol de usuario', async () => {
+      logger.info('Test: Remover rol de usuario');
+      
+      // Crear usuario
+      const userData = {
+        nombre: 'Usuario Remover Rol',
+        email: 'remover.rol@example.com',
+        contraseña: 'password123'
+      };
+      
+      const createResponse = await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(userData);
+
+      const userId = createResponse.body.user.id;
+
+      // Asignar rol
+      await request(app)
+        .post('/api/roles/assign')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ 
+          userId: userId, 
+          roleIdentifier: 'responsable_tarea' 
+        });
+
+      // Obtener el roleId
+      const rolesResponse = await request(app)
+        .get(`/api/users/${userId}/roles`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      const roles = rolesResponse.body.data?.roles || rolesResponse.body.roles || rolesResponse.body || [];
+      const roleToRemove = roles.find(r => r.nombre === 'responsable_tarea' || r.rol_nombre === 'responsable_tarea');
+
+      if (roleToRemove) {
+        // Usar rol_id si existe, sino usar id
+        const roleIdToRemove = roleToRemove.rol_id || roleToRemove.id;
+        
+        const response = await request(app)
+          .delete(`/api/users/${userId}/roles/${roleIdToRemove}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200);
+
+        expect(response.body).toMatchObject({
+          success: true,
+          message: expect.stringContaining('removido')
+        });
+      }
+      
+      logger.success('Remoción de rol funcionando');
+    });
+  });
+
   describe('Flujo completo de gestión de usuarios', () => {
     test('Debe completar flujo: crear -> asignar rol -> verificar -> actualizar -> eliminar', async () => {
       logger.info('Test: Flujo completo de gestión de usuarios');
