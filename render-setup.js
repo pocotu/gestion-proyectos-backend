@@ -42,6 +42,16 @@ async function renderDatabaseSetup() {
     
     console.log('[SUCCESS] [RENDER-SETUP] Conexion a la base de datos establecida');
     
+    // Limpiar base de datos si CLEAN_DATABASE=true
+    if (process.env.CLEAN_DATABASE === 'true') {
+      console.log('[RENDER-SETUP] CLEAN_DATABASE=true detectado, limpiando base de datos...');
+      const { cleanDatabaseSync } = require('./scripts/clean-database');
+      await cleanDatabaseSync();
+      console.log('[SUCCESS] [RENDER-SETUP] Base de datos limpiada');
+    } else {
+      console.log('[RENDER-SETUP] CLEAN_DATABASE no esta activo, manteniendo datos existentes');
+    }
+    
     // Ejecutar configuración completa
     console.log('[RENDER-SETUP] Ejecutando configuracion completa de tablas y datos...');
     await createAllTables();
