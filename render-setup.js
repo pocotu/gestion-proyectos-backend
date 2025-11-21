@@ -42,19 +42,20 @@ async function renderDatabaseSetup() {
     
     console.log('[SUCCESS] [RENDER-SETUP] Conexion a la base de datos establecida');
     
+    // Ejecutar migraciones
+    console.log('[RENDER-SETUP] Ejecutando migraciones SQL...');
+    const { MigrationManager } = require('./scripts/migrate');
+    const migrationManager = new MigrationManager();
+    
     // Limpiar base de datos si CLEAN_DATABASE=true
     if (process.env.CLEAN_DATABASE === 'true') {
       console.log('[RENDER-SETUP] CLEAN_DATABASE=true detectado, limpiando base de datos...');
-      const { cleanDatabaseSync } = require('./scripts/clean-database');
-      await cleanDatabaseSync();
+      await migrationManager.cleanDatabase();
       console.log('[SUCCESS] [RENDER-SETUP] Base de datos limpiada');
-    } else {
-      console.log('[RENDER-SETUP] CLEAN_DATABASE no esta activo, manteniendo datos existentes');
     }
     
-    // Ejecutar configuración completa
-    console.log('[RENDER-SETUP] Ejecutando configuracion completa de tablas y datos...');
-    await createAllTables();
+    await migrationManager.runMigrations();
+    console.log('[SUCCESS] [RENDER-SETUP] Migraciones completadas');
     
     // Ejecutar seeders para datos de ejemplo
     console.log('[RENDER-SETUP] Ejecutando seeders para datos de ejemplo...');
