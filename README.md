@@ -1,231 +1,92 @@
-# gestion-proyectos-backend
+# Backend - Sistema de Gestión de Proyectos
 
-Backend (Node.js + Express + MySQL) para el Sistema de Gestión de Proyectos (MVP).
+Backend con Node.js + Express + MySQL siguiendo principios SOLID.
 
-## 🎯 Estado del Proyecto
-
-**✅ Listo para MVP - 73% de tests pasando**
-
-- ✅ Tests Core: 24/24 (100%)
-- ⚠️ Tests Avanzados: 43/68 (63%)
-- ✅ Código siguiendo principios SOLID
-- ✅ Arquitectura escalable
-
-Ver [RESUMEN_TESTS.md](./RESUMEN_TESTS.md) para detalles completos.
-
-## 📁 Estructura
+## Estructura
 
 ```
 src/
-  controllers/      # Controladores HTTP (capa de presentación)
-  services/         # Lógica de negocio
-  repositories/     # Acceso a datos
-  models/           # Modelos de base de datos
-  middleware/       # Middleware de Express
-  routes/           # Definición de rutas
-  config/           # Configuración
-  utils/            # Utilidades (errores personalizados, etc.)
-  app.js            # Configuración de Express
-  server.js         # Punto de entrada
-tests/
-  integration/      # Tests de integración
-  utils/            # Utilidades para tests
-.env.example
-package.json
+  controllers/    # HTTP handlers
+  services/       # Logica de negocio
+  repositories/   # Acceso a datos
+  models/         # Modelos DB
+  middleware/     # Middleware
+  routes/         # Rutas
 ```
 
-## 🚀 Instalación
+## Instalacion Local
 
 ```bash
-# 1. Instalar dependencias
-cd gestion-proyectos-backend
 npm install
-
-# 2. Configurar variables de entorno
 cp .env.example .env
-# Editar .env con tus credenciales de MySQL
-
-# 3. Crear base de datos
+# Editar .env con credenciales MySQL
 mysql -u root -p < ../docs/base_de_datos.sql
-
-# 4. Ejecutar seeders (opcional - datos de prueba)
 npm run seed
-
-# 5. Iniciar servidor
 npm run dev
 ```
 
-## 📚 Documentación
-
-📖 **[Índice Completo de Documentación](./docs/README.md)**
-
-## 🚀 Deploy en Render
-
-### ⚠️ Importante: Configuración Manual
-
-**NO se usa archivo render.yaml** - Todo se configura desde el Dashboard de Render mediante variables de entorno.
-
-### Quick Start (5 minutos)
-
-🚀 **[Quick Start - Deploy en Render](./docs/QUICK_START_RENDER.md)**
-
-### Guías Paso a Paso
-
-🎯 **[Configuración Manual de Render](./docs/RENDER_MANUAL_SETUP.md)** - Paso a paso sin archivos YAML
-📖 **[Guía Completa de Deploy](./docs/RENDER_DEPLOY_GUIDE.md)** - Instrucciones detalladas
-✅ **[Checklist de Deploy](./docs/DEPLOY_CHECKLIST.md)** - Verificación completa
-📋 **[Resumen de Automatización](./docs/DEPLOY_AUTOMATION_SUMMARY.md)** - Implementación técnica
-🔧 **[Variables de Entorno](./docs/ENVIRONMENT_VARIABLES.md)** - Referencia completa
-
-### Control de Limpieza de Base de Datos
-
-El sistema incluye un mecanismo para limpiar la base de datos durante el deploy:
-
-- **Activar limpieza**: `CLEAN_DATABASE=true` en variables de entorno de Render
-- **Desactivar limpieza**: `CLEAN_DATABASE=false` (por defecto)
-
-⚠️ **IMPORTANTE**: Siempre cambia a `false` después de un deploy con limpieza.
-
-### Comandos Útiles para Deploy
+### Variables de Entorno Requeridas
 
 ```bash
-# Verificar configuración antes de deploy
-npm run verify:config
-
-# Probar limpieza localmente (sin ejecutar)
-npm run db:clean:test
-
-# Probar limpieza localmente (ejecutar)
-npm run db:clean:test:force
-
-# Limpiar base de datos manualmente
-npm run db:clean:force
-
-# Resetear base de datos completa (limpiar + seeders)
-npm run db:reset
+DB_HOST=tu-host
+DB_NAME=tu-database
+DB_USER=tu-usuario
+DB_PASSWORD=tu-password
+JWT_SECRET=tu-secret-32-chars-minimo
+FRONTEND_URL=https://tu-frontend.vercel.app
+NODE_ENV=production
+SETUP_DB=true
+CLEAN_DATABASE=false
 ```
 
-## 🧪 Tests
+### Limpiar Base de Datos
+
+Para resetear la BD en Render:
+1. Cambiar `CLEAN_DATABASE=true` en Environment
+2. Esperar deploy (2-3 min)
+3. Cambiar `CLEAN_DATABASE=false` (IMPORTANTE)
+
+## Tests
 
 ```bash
-# Ejecutar todos los tests
-npm test
-
-# Ejecutar solo tests que pasan (100%)
-./run-passing-tests.sh
-
-# Ejecutar tests específicos
-npm test -- tests/integration/auth.test.js
-npm test -- tests/integration/users.test.js
-
-# Ver cobertura
-npm test -- --coverage
+npm test                                    # Todos los tests
+npm test -- tests/integration/auth.test.js # Test especifico
+npm test -- --coverage                      # Con cobertura
 ```
 
-## 📊 Tests Disponibles
+## Arquitectura
 
-| Test Suite | Estado | Tests |
-|------------|--------|-------|
-| Auth | ✅ 100% | 6/6 |
-| Users | ✅ 100% | 9/9 |
-| Projects Simple | ✅ 100% | 3/3 |
-| Tasks Simple | ✅ 100% | 3/3 |
-| Tasks Fixed | ✅ 100% | 3/3 |
-| Projects | ⚠️ 71% | 24/34 |
-| Tasks | ⚠️ 56% | 19/34 |
-
-## 🏗️ Arquitectura
-
-### Principios SOLID
-
-- **S**ingle Responsibility: Cada clase tiene una sola responsabilidad
-- **O**pen/Closed: Abierto para extensión, cerrado para modificación
-- **L**iskov Substitution: Subtipos sustituyen a tipos base
-- **I**nterface Segregation: Interfaces específicas
-- **D**ependency Inversion: Depende de abstracciones
-
-### Capas
-
+Capas siguiendo principios SOLID:
 ```
-┌─────────────────┐
-│   Controllers   │ ← Maneja HTTP requests/responses
-├─────────────────┤
-│    Services     │ ← Lógica de negocio
-├─────────────────┤
-│  Repositories   │ ← Acceso a datos
-├─────────────────┤
-│     Models      │ ← Estructura de datos
-└─────────────────┘
+Controllers -> Services -> Repositories -> Models
 ```
 
-## 🔧 Scripts Disponibles
+## Scripts
 
 ```bash
-npm run dev          # Desarrollo con nodemon
-npm start            # Producción
-npm test             # Ejecutar tests
-npm run seed         # Ejecutar seeders
-npm run seed:refresh # Limpiar y volver a sembrar
+npm run dev    # Desarrollo
+npm start      # Produccion
+npm test       # Tests
+npm run seed   # Poblar BD
+npm run db:clean # Limpiar BD
 ```
 
-## 📝 Documentación
+## Seguridad
 
-- [RESUMEN_TESTS.md](./RESUMEN_TESTS.md) - Estado detallado de tests
-- [TESTS_STATUS.md](./TESTS_STATUS.md) - Problemas y soluciones
-- [../docs/casos_prueba_integracion.md](../docs/casos_prueba_integracion.md) - Casos de prueba
+- JWT Authentication
+- Bcrypt (12 rounds)
+- Helmet + CORS
+- Rate limiting
 
-## 🔐 Seguridad
+## API Endpoints
 
-- ✅ Autenticación JWT
-- ✅ Bcrypt para contraseñas (12 rounds)
-- ✅ Helmet para headers de seguridad
-- ✅ Rate limiting
-- ✅ CORS configurado
-- ✅ Validación de inputs
-
-## 🌐 API Endpoints
-
-### Autenticación
-- `POST /api/auth/register` - Registrar usuario
-- `POST /api/auth/login` - Iniciar sesión
-- `GET /api/auth/profile` - Obtener perfil
-
-### Usuarios
-- `GET /api/users` - Listar usuarios (admin)
-- `POST /api/users` - Crear usuario (admin)
-- `GET /api/users/:id` - Obtener usuario
-- `PUT /api/users/:id` - Actualizar usuario
-- `DELETE /api/users/:id` - Eliminar usuario (admin)
-
-### Proyectos
-- `GET /api/projects` - Listar proyectos
-- `POST /api/projects` - Crear proyecto
-- `GET /api/projects/:id` - Obtener proyecto
-- `PUT /api/projects/:id` - Actualizar proyecto
-- `DELETE /api/projects/:id` - Eliminar proyecto
-- `GET /api/projects/search` - Buscar proyectos
-
-### Tareas
-- `GET /api/tasks` - Listar tareas
-- `POST /api/tasks` - Crear tarea
-- `GET /api/tasks/:id` - Obtener tarea
-- `PUT /api/tasks/:id` - Actualizar tarea
-- `DELETE /api/tasks/:id` - Eliminar tarea
-
-### Roles
-- `GET /api/roles` - Listar roles
-- `POST /api/roles/assign` - Asignar rol
-- `DELETE /api/roles/remove` - Remover rol
-
-## 🐛 Troubleshooting
-
-Ver [../QUICK_START.md](../QUICK_START.md) para solución de problemas comunes.
-
-## 📄 Licencia
-
-MIT
+- `/api/auth/*` - Autenticacion
+- `/api/users/*` - Usuarios
+- `/api/projects/*` - Proyectos
+- `/api/tasks/*` - Tareas
+- `/api/roles/*` - Roles
+- `/api/dashboard` - Dashboard
 
 ---
 
-**Última actualización**: 2025-11-12
-**Estado**: ✅ Listo para MVP
+**Stack**: Node.js + Express + MySQL + JWT

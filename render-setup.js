@@ -26,64 +26,63 @@ const SeederManager = require('./src/seeders/index');
 async function renderDatabaseSetup() {
   const startTime = Date.now();
   
-  console.log('🚀 [RENDER-SETUP] Iniciando configuración de base de datos para Render...');
-  console.log('🌍 [RENDER-SETUP] Entorno:', process.env.NODE_ENV || 'development');
-  console.log('🗄️ [RENDER-SETUP] Base de datos:', process.env.DB_NAME);
-  console.log('🖥️ [RENDER-SETUP] Host:', process.env.DB_HOST);
+  console.log('[RENDER-SETUP] Iniciando configuracion de base de datos para Render...');
+  console.log('[RENDER-SETUP] Entorno:', process.env.NODE_ENV || 'development');
+  console.log('[RENDER-SETUP] Base de datos:', process.env.DB_NAME);
+  console.log('[RENDER-SETUP] Host:', process.env.DB_HOST);
   
   try {
     // Verificar conexión a la base de datos
-    console.log('🔍 [RENDER-SETUP] Verificando conexión a la base de datos...');
+    console.log('[RENDER-SETUP] Verificando conexion a la base de datos...');
     const connected = await testConnection();
     
     if (!connected) {
-      throw new Error('❌ No se pudo conectar a la base de datos en Render');
+      throw new Error('[ERROR] No se pudo conectar a la base de datos en Render');
     }
     
-    console.log('✅ [RENDER-SETUP] Conexión a la base de datos establecida');
+    console.log('[SUCCESS] [RENDER-SETUP] Conexion a la base de datos establecida');
     
     // Ejecutar configuración completa
-    console.log('🔧 [RENDER-SETUP] Ejecutando configuración completa de tablas y datos...');
+    console.log('[RENDER-SETUP] Ejecutando configuracion completa de tablas y datos...');
     await createAllTables();
     
     // Ejecutar seeders para datos de ejemplo
-    console.log('🌱 [RENDER-SETUP] Ejecutando seeders para datos de ejemplo...');
+    console.log('[RENDER-SETUP] Ejecutando seeders para datos de ejemplo...');
     const seederManager = new SeederManager();
     await seederManager.runAll();
-    console.log('✅ [RENDER-SETUP] Seeders ejecutados exitosamente');
+    console.log('[SUCCESS] [RENDER-SETUP] Seeders ejecutados exitosamente');
     
     const duration = Date.now() - startTime;
-    console.log(`🎉 [RENDER-SETUP] ¡Configuración completada exitosamente en ${duration}ms!`);
-    console.log('📋 [RENDER-SETUP] Resumen de lo configurado:');
-    console.log('   ✅ Todas las tablas creadas/verificadas');
-    console.log('   ✅ Roles por defecto insertados');
-    console.log('   ✅ Usuario administrador por defecto creado');
-    console.log('   ✅ Usuarios de ejemplo creados');
-    console.log('   ✅ Proyectos de ejemplo creados');
-    console.log('   ✅ Tareas de ejemplo creadas');
-    console.log('   ✅ Logs de actividad generados');
-    console.log('   ✅ Transacciones confirmadas');
+    console.log(`[SUCCESS] [RENDER-SETUP] Configuracion completada exitosamente en ${duration}ms!`);
+    console.log('[RENDER-SETUP] Resumen de lo configurado:');
+    console.log('   [OK] Todas las tablas creadas/verificadas');
+    console.log('   [OK] Roles por defecto insertados');
+    console.log('   [OK] Usuario administrador por defecto creado');
+    console.log('   [OK] Proyectos de ejemplo creados');
+    console.log('   [OK] Tareas de ejemplo creadas');
+    console.log('   [OK] Logs de actividad generados');
+    console.log('   [OK] Transacciones confirmadas');
     
     // Información importante para el deploy
     console.log('');
-    console.log('🔑 [RENDER-SETUP] CREDENCIALES DE ADMINISTRADOR:');
-    console.log('   📧 Email: admin@gestion-proyectos.com');
-    console.log('   🔒 Password: Admin123!');
-    console.log('   ⚠️  Cambia esta contraseña después del primer login');
+    console.log('[CREDENTIALS] [RENDER-SETUP] CREDENCIALES DE ADMINISTRADOR:');
+    console.log('   Email: admin@gestion-proyectos.com');
+    console.log('   Password: Admin123!');
+    console.log('   [WARNING] Cambia esta contraseña despues del primer login');
     console.log('');
     
     logger.info('Render database setup completed successfully', { duration });
     
   } catch (error) {
-    console.error('💥 [RENDER-SETUP] Error durante la configuración:', error.message);
-    console.error('💥 [RENDER-SETUP] Stack trace:', error.stack);
+    console.error('[ERROR] [RENDER-SETUP] Error durante la configuracion:', error.message);
+    console.error('[ERROR] [RENDER-SETUP] Stack trace:', error.stack);
     logger.error('Render database setup failed:', error);
     
     // En Render, es importante que el script falle claramente
     process.exit(1);
   }
   
-  console.log('✅ [RENDER-SETUP] Script de configuración terminado exitosamente');
+  console.log('[SUCCESS] [RENDER-SETUP] Script de configuracion terminado exitosamente');
   process.exit(0);
 }
 

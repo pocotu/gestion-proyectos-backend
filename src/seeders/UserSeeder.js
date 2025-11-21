@@ -16,7 +16,7 @@ class UserSeeder extends BaseSeeder {
   }
 
   /**
-   * Ejecuta el seeding del usuario administrador por defecto y usuarios de ejemplo
+   * Ejecuta el seeding del usuario administrador por defecto
    */
   async seed() {
     // Crear usuario administrador por defecto
@@ -39,59 +39,6 @@ class UserSeeder extends BaseSeeder {
         await this.insertIfNotExists('usuario_roles', {
           usuario_id: adminId,
           rol_id: adminRoleId
-        }, ['usuario_id', 'rol_id']);
-      }
-    }
-
-    // Crear usuarios de ejemplo para proyectos y tareas
-    const exampleUsers = [
-      {
-        nombre: 'Carlos Rodríguez',
-        email: 'carlos.rodriguez@example.com',
-        contraseña: await this.hashPassword('Demo123!'),
-        telefono: '+1234567891',
-        estado: 1,
-        es_administrador: 0
-      },
-      {
-        nombre: 'Ana Martínez',
-        email: 'ana.martinez@example.com',
-        contraseña: await this.hashPassword('Demo123!'),
-        telefono: '+1234567892',
-        estado: 1,
-        es_administrador: 0
-      },
-      {
-        nombre: 'Luis González',
-        email: 'luis.gonzalez@example.com',
-        contraseña: await this.hashPassword('Demo123!'),
-        telefono: '+1234567893',
-        estado: 1,
-        es_administrador: 0
-      },
-      {
-        nombre: 'María López',
-        email: 'maria.lopez@example.com',
-        contraseña: await this.hashPassword('Demo123!'),
-        telefono: '+1234567894',
-        estado: 1,
-        es_administrador: 0
-      }
-    ];
-
-    // Obtener IDs de roles
-    const responsableProyectoRoleId = await this.getId('roles', { nombre: 'responsable_proyecto' });
-    const responsableTareaRoleId = await this.getId('roles', { nombre: 'responsable_tarea' });
-
-    // Crear usuarios de ejemplo y asignar roles
-    for (const user of exampleUsers) {
-      const userId = await this.insertIfNotExists('usuarios', user, ['email']);
-      
-      if (userId && responsableProyectoRoleId) {
-        // Asignar rol de responsable_proyecto a todos los usuarios de ejemplo
-        await this.insertIfNotExists('usuario_roles', {
-          usuario_id: userId,
-          rol_id: responsableProyectoRoleId
         }, ['usuario_id', 'rol_id']);
       }
     }
