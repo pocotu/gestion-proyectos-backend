@@ -22,6 +22,9 @@ class UserService {
    * Obtener todos los usuarios con paginación y filtros
    */
   async getAllUsers(options = {}) {
+    const UserRoleRepository = require('../repositories/UserRoleRepository');
+    const userRoleRepository = new UserRoleRepository();
+    
     try {
       console.log('UserService.getAllUsers - Iniciando con:', options);
       
@@ -37,8 +40,26 @@ class UserService {
       const total = await this.userRepository.count(filters);
       console.log('UserService.getAllUsers - Total count:', total);
 
+      // Obtener roles para cada usuario
+      const usersWithRoles = await Promise.all(
+        users.map(async (user) => {
+          const sanitized = this.sanitizeUser(user);
+          try {
+            const roles = await userRoleRepository.getUserRoles(user.id);
+            sanitized.roles = roles.map(r => ({
+              id: r.rol_id,
+              nombre: r.rol_nombre
+            }));
+          } catch (error) {
+            console.error(`Error obteniendo roles para usuario ${user.id}:`, error);
+            sanitized.roles = [];
+          }
+          return sanitized;
+        })
+      );
+
       return {
-        users: users.map(user => this.sanitizeUser(user)),
+        users: usersWithRoles,
         pagination: {
           currentPage: page,
           totalPages: Math.ceil(total / limit),

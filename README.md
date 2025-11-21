@@ -55,6 +55,56 @@ npm run seed
 npm run dev
 ```
 
+## 📚 Documentación
+
+📖 **[Índice Completo de Documentación](./docs/README.md)**
+
+## 🚀 Deploy en Render
+
+### ⚠️ Importante: Configuración Manual
+
+**NO se usa archivo render.yaml** - Todo se configura desde el Dashboard de Render mediante variables de entorno.
+
+### Quick Start (5 minutos)
+
+🚀 **[Quick Start - Deploy en Render](./docs/QUICK_START_RENDER.md)**
+
+### Guías Paso a Paso
+
+🎯 **[Configuración Manual de Render](./docs/RENDER_MANUAL_SETUP.md)** - Paso a paso sin archivos YAML
+📖 **[Guía Completa de Deploy](./docs/RENDER_DEPLOY_GUIDE.md)** - Instrucciones detalladas
+✅ **[Checklist de Deploy](./docs/DEPLOY_CHECKLIST.md)** - Verificación completa
+📋 **[Resumen de Automatización](./docs/DEPLOY_AUTOMATION_SUMMARY.md)** - Implementación técnica
+🔧 **[Variables de Entorno](./docs/ENVIRONMENT_VARIABLES.md)** - Referencia completa
+
+### Control de Limpieza de Base de Datos
+
+El sistema incluye un mecanismo para limpiar la base de datos durante el deploy:
+
+- **Activar limpieza**: `CLEAN_DATABASE=true` en variables de entorno de Render
+- **Desactivar limpieza**: `CLEAN_DATABASE=false` (por defecto)
+
+⚠️ **IMPORTANTE**: Siempre cambia a `false` después de un deploy con limpieza.
+
+### Comandos Útiles para Deploy
+
+```bash
+# Verificar configuración antes de deploy
+npm run verify:config
+
+# Probar limpieza localmente (sin ejecutar)
+npm run db:clean:test
+
+# Probar limpieza localmente (ejecutar)
+npm run db:clean:test:force
+
+# Limpiar base de datos manualmente
+npm run db:clean:force
+
+# Resetear base de datos completa (limpiar + seeders)
+npm run db:reset
+```
+
 ## 🧪 Tests
 
 ```bash

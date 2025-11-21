@@ -24,7 +24,10 @@ class AuthService {
    * @param {Object} userData - Datos del usuario
    * @returns {Object} Usuario creado y token
    */
-  async register({ nombre, email, contraseña, telefono, es_administrador = false }) {
+  async register({ nombre, email, contraseña, telefono, es_administrador = false, roles = [], assignedBy = null }) {
+    const RoleService = require('./roleService');
+    const roleService = new RoleService();
+    
     try {
       // Verificar si el usuario ya existe
       const existingUser = await this.userModel.findByEmail(email);
@@ -44,7 +47,18 @@ class AuthService {
         es_administrador
       });
 
-      // Obtener usuario creado
+      // Asignar roles si se proporcionaron
+      if (roles && roles.length > 0) {
+        console.log('🎯 [AUTH-SERVICE] register - Asignando roles:', roles);
+        try {
+          await roleService.assignMultipleRoles(result.id, roles, assignedBy);
+        } catch (roleError) {
+          console.error('Error asignando roles:', roleError);
+          // No fallar el registro si hay error en roles
+        }
+      }
+
+      // Obtener usuario creado con roles
       const user = await this.userModel.findById(result.id);
       
       // Generar token

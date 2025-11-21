@@ -279,22 +279,45 @@ class RoleController {
   }
 
   /**
-   * Obtiene todos los roles disponibles
+   * Obtiene todos los roles disponibles con información adicional
    * GET /api/roles
    */
   async getAllRoles(req, res) {
+    const UserRoleRepository = require('../repositories/UserRoleRepository');
+    const userRoleRepository = new UserRoleRepository();
+    
     try {
       const roles = await this.roleRepository.findAll();
+
+      // Obtener contador de usuarios para cada rol
+      const rolesWithCount = await Promise.all(
+        roles.map(async (role) => {
+          try {
+            const userRoles = await userRoleRepository.getUsersByRole(role.id);
+            return {
+              id: role.id,
+              nombre: role.nombre,
+              created_at: role.created_at || null,
+              user_count: userRoles.length
+            };
+          } catch (error) {
+            console.error(`Error obteniendo usuarios para rol ${role.id}:`, error);
+            return {
+              id: role.id,
+              nombre: role.nombre,
+              created_at: role.created_at || null,
+              user_count: 0
+            };
+          }
+        })
+      );
 
       return res.status(200).json({
         success: true,
         message: 'Roles obtenidos exitosamente',
         data: {
-          roles: roles.map(role => ({
-            id: role.id,
-            nombre: role.nombre
-          })),
-          count: roles.length
+          roles: rolesWithCount,
+          count: rolesWithCount.length
         }
       });
 

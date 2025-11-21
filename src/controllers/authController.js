@@ -23,7 +23,7 @@ class AuthController {
     console.log('🎯 [AUTH-CONTROLLER] register - req.body:', req.body);
     
     try {
-      const { nombre, email, contraseña, telefono, es_administrador } = req.body;
+      const { nombre, email, contraseña, telefono, es_administrador, roles } = req.body;
 
       // Validar datos requeridos
       if (!nombre || !email || !contraseña) {
@@ -40,7 +40,9 @@ class AuthController {
         email,
         contraseña,
         telefono,
-        es_administrador
+        es_administrador,
+        roles,
+        assignedBy: req.user?.id
       });
 
       console.log('🎯 [AUTH-CONTROLLER] register - Usuario creado exitosamente');

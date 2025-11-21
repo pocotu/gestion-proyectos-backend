@@ -43,6 +43,13 @@ class RoleMiddleware {
           });
         }
 
+        // Si el usuario es administrador (es_administrador = 1) y se requiere el rol 'admin', permitir acceso
+        if (req.user.es_administrador && allowedRoles.includes('admin')) {
+          req.userRoles = ['admin'];
+          req.hasRole = (roleName) => roleName === 'admin';
+          return next();
+        }
+
         // Obtener roles del usuario usando método estático
         const userRoles = await UserRoleRepository.getUserRolesStatic(req.user.id);
         const userRoleNames = userRoles.map(role => role.rol_nombre);

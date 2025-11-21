@@ -117,8 +117,7 @@ class UserRoleRepository extends BaseRepository {
       .select('usuario_roles.*, usuarios.nombre as usuario_nombre, usuarios.email')
       .join('usuarios', 'usuario_roles.usuario_id', 'usuarios.id')
       .where('usuario_roles.rol_id', rol_id)
-      .where('usuario_roles.activo', true)
-      .where('usuarios.estado', 'activo')
+      .where('usuarios.estado', 1) // estado = 1 significa activo
       .orderBy('usuarios.nombre', 'ASC')
       .get();
   }
@@ -130,7 +129,7 @@ class UserRoleRepository extends BaseRepository {
     // Resetear el query builder para evitar conflictos
     this.reset();
     
-    const result = await this.where('usuario_id', usuario_id).where('rol_id', rol_id).where('activo', true).first();
+    const result = await this.where('usuario_id', usuario_id).where('rol_id', rol_id).first();
     return !!result;
   }
 
@@ -142,7 +141,7 @@ class UserRoleRepository extends BaseRepository {
       SELECT COUNT(*) as count 
       FROM usuario_roles ur 
       INNER JOIN roles user_role_check_table ON ur.rol_id = user_role_check_table.id 
-      WHERE ur.usuario_id = ? AND user_role_check_table.nombre = ? AND ur.activo = TRUE
+      WHERE ur.usuario_id = ? AND user_role_check_table.nombre = ?
     `, [usuario_id, rol_nombre]);
     
     return result[0].count > 0;
@@ -200,13 +199,18 @@ class UserRoleRepository extends BaseRepository {
    */
   async syncUserRoles(usuario_id, rol_ids, asignado_por = null) {
     try {
-      // Desactivar todos los roles actuales
-      await this.where('usuario_id', usuario_id).update({ activo: false });
+      // Eliminar todos los roles actuales del usuario
+      await this.where('usuario_id', usuario_id).delete();
 
       // Asignar los nuevos roles
       const results = [];
       for (const rol_id of rol_ids) {
-        const result = await this.assignRole(usuario_id, rol_id, asignado_por);
+        const data = {
+          usuario_id,
+          rol_id,
+          created_at: new Date()
+        };
+        const result = await this.insert(data);
         results.push(result);
       }
 
@@ -221,13 +225,12 @@ class UserRoleRepository extends BaseRepository {
    */
   async getStatistics() {
     try {
-      const totalAssignments = await this.where('activo', true).count();
+      const totalAssignments = await this.count();
       
       const mostAssignedRole = await this.raw(`
         SELECT role_stats_table.nombre, COUNT(ur.id) as assignment_count
         FROM usuario_roles ur
         INNER JOIN roles role_stats_table ON ur.rol_id = role_stats_table.id
-        WHERE ur.activo = TRUE
         GROUP BY ur.rol_id, role_stats_table.nombre
         ORDER BY assignment_count DESC
         LIMIT 1
@@ -237,7 +240,6 @@ class UserRoleRepository extends BaseRepository {
         SELECT u.nombre, u.email, COUNT(ur.id) as role_count
         FROM usuario_roles ur
         INNER JOIN usuarios u ON ur.usuario_id = u.id
-        WHERE ur.activo = TRUE
         GROUP BY ur.usuario_id, u.nombre, u.email
         ORDER BY role_count DESC
         LIMIT 1
@@ -246,7 +248,7 @@ class UserRoleRepository extends BaseRepository {
       const rolesDistribution = await this.raw(`
         SELECT role_distribution_table.nombre, COUNT(ur.id) as user_count
         FROM roles role_distribution_table
-        LEFT JOIN usuario_roles ur ON role_distribution_table.id = ur.rol_id AND ur.activo = TRUE
+        LEFT JOIN usuario_roles ur ON role_distribution_table.id = ur.rol_id
         GROUP BY role_distribution_table.id, role_distribution_table.nombre
         ORDER BY user_count DESC
       `);
@@ -278,7 +280,7 @@ class UserRoleRepository extends BaseRepository {
         FROM usuarios u
         INNER JOIN usuario_roles ur ON u.id = ur.usuario_id
         INNER JOIN roles user_roles_search_table ON ur.rol_id = user_roles_search_table.id
-        WHERE user_roles_search_table.nombre IN (${placeholders}) AND ur.activo = TRUE AND u.estado = 'activo'
+        WHERE user_roles_search_table.nombre IN (${placeholders}) AND u.estado = 1
         GROUP BY u.id
         ORDER BY u.nombre ASC
       `, rol_names);
@@ -295,8 +297,8 @@ class UserRoleRepository extends BaseRepository {
       return await this.raw(`
         SELECT u.*
         FROM usuarios u
-        LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id AND ur.activo = TRUE
-        WHERE ur.id IS NULL AND u.estado = 'activo'
+        LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
+        WHERE ur.id IS NULL AND u.estado = 1
         ORDER BY u.nombre ASC
       `);
     } catch (error) {
@@ -338,17 +340,22 @@ class UserRoleRepository extends BaseRepository {
   }
 
   /**
-   * Reactiva un rol previamente desactivado
+   * Reactiva un rol (en este caso, simplemente lo asigna si no existe)
    */
   async reactivateRole(usuario_id, rol_id, asignado_por = null) {
-    return await this
-      .where('usuario_id', usuario_id)
-      .where('rol_id', rol_id)
-      .update({
-        activo: true,
-        asignado_por,
-        updated_at: new Date()
-      });
+    // Verificar si ya existe
+    const exists = await this.hasRole(usuario_id, rol_id);
+    if (exists) {
+      return { message: 'El rol ya está asignado' };
+    }
+    
+    // Si no existe, lo creamos
+    const data = {
+      usuario_id,
+      rol_id,
+      created_at: new Date()
+    };
+    return await this.insert(data);
   }
 
   /**
@@ -359,8 +366,8 @@ class UserRoleRepository extends BaseRepository {
       return await this.raw(`
         SELECT u.id, u.nombre, u.email, COUNT(ur.id) as role_count
         FROM usuarios u
-        LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id AND ur.activo = TRUE
-        WHERE u.estado = 'activo'
+        LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
+        WHERE u.estado = 1
         GROUP BY u.id, u.nombre, u.email
         ORDER BY role_count DESC, u.nombre ASC
       `);
@@ -446,7 +453,7 @@ class UserRoleRepository extends BaseRepository {
       FROM usuarios u
       LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
       LEFT JOIN roles user_roles_search_table ON ur.rol_id = user_roles_search_table.id
-      WHERE user_roles_search_table.nombre IN (${placeholders}) AND u.estado = 'activo'
+      WHERE user_roles_search_table.nombre IN (${placeholders}) AND u.estado = 1
       GROUP BY u.id, u.nombre, u.email, u.estado
     `;
     
@@ -465,7 +472,7 @@ class UserRoleRepository extends BaseRepository {
       FROM usuarios u
       LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
       LEFT JOIN roles user_roles_active_table ON ur.rol_id = user_roles_active_table.id
-      WHERE u.estado = 'activo'
+      WHERE u.estado = 1
       GROUP BY u.id, u.nombre, u.email, u.estado
     `;
     
