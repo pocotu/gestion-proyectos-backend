@@ -26,7 +26,35 @@ const app = express();
 
 // Security middleware
 app.use(helmet());
-app.use(cors());
+
+// CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permitir requests sin origin (como mobile apps o curl)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://gestion-proyectos-frontend-inky.vercel.app',
+      process.env.FRONTEND_URL
+    ].filter(Boolean); // Filtrar valores undefined
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      logger.warn(`CORS blocked request from origin: ${origin}`);
+      callback(null, true); // En producción, cambiar a: callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600 // 10 minutos
+};
+
+app.use(cors(corsOptions));
 
 // Rate limiting - configurable via environment variables
 const limiter = rateLimit({
