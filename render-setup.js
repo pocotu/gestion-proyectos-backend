@@ -1,18 +1,4 @@
 #!/usr/bin/env node
-/**
- * Render Database Setup Script
- * 
- * Este script está diseñado específicamente para ejecutarse en Render
- * y configurar la base de datos con logs detallados para debugging.
- * 
- * Variables de entorno requeridas en Render:
- * - DB_HOST
- * - DB_PORT
- * - DB_NAME  
- * - DB_USER
- * - DB_PASSWORD
- * - SETUP_DB=true (para activar el setup automático)
- */
 
 require('dotenv').config();
 

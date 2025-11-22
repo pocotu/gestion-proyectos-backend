@@ -193,10 +193,10 @@ class TaskSeeder extends BaseSeeder {
   /**
    * Crea tareas específicas adicionales
    */
-  async createSpecificTasks(projects, users) {
-    // Verificar que tenemos proyectos y usuarios válidos
-    if (!projects || projects.length === 0 || !users || users.length === 0) {
-      console.log('⚠️ No hay proyectos o usuarios disponibles para crear tareas específicas');
+  async createSpecificTasks(projects, admin) {
+    // Verificar que tenemos proyectos y admin válidos
+    if (!projects || projects.length === 0 || !admin) {
+      console.log('⚠️ No hay proyectos o admin disponible para crear tareas específicas');
       return;
     }
 
@@ -209,8 +209,8 @@ class TaskSeeder extends BaseSeeder {
         fecha_inicio: this.getCurrentDate(),
         fecha_fin: this.getDatePlusDays(this.getCurrentDate(), 3),
         proyecto_id: this.randomChoice(projects).id,
-        usuario_asignado_id: this.randomChoice(users).id,
-        creado_por: this.randomChoice(users).id
+        usuario_asignado_id: admin.id,
+        creado_por: admin.id
       },
       {
         titulo: 'Optimización de base de datos',
@@ -220,8 +220,8 @@ class TaskSeeder extends BaseSeeder {
         fecha_inicio: this.getDateMinusDays(this.getCurrentDate(), 15),
         fecha_fin: this.getDateMinusDays(this.getCurrentDate(), 5),
         proyecto_id: this.randomChoice(projects).id,
-        usuario_asignado_id: this.randomChoice(users).id,
-        creado_por: this.randomChoice(users).id
+        usuario_asignado_id: admin.id,
+        creado_por: admin.id
       },
       {
         titulo: 'Testing de integración',
@@ -231,8 +231,8 @@ class TaskSeeder extends BaseSeeder {
         fecha_inicio: this.getDateMinusDays(this.getCurrentDate(), 5),
         fecha_fin: this.getDatePlusDays(this.getCurrentDate(), 10),
         proyecto_id: this.randomChoice(projects).id,
-        usuario_asignado_id: this.randomChoice(users).id,
-        creado_por: this.randomChoice(users).id
+        usuario_asignado_id: admin.id,
+        creado_por: admin.id
       },
       {
         titulo: 'Backup y recuperación',
@@ -242,8 +242,8 @@ class TaskSeeder extends BaseSeeder {
         fecha_inicio: this.getCurrentDate(),
         fecha_fin: this.getDatePlusDays(this.getCurrentDate(), 7),
         proyecto_id: this.randomChoice(projects).id,
-        usuario_asignado_id: this.randomChoice(users).id,
-        creado_por: this.randomChoice(users).id
+        usuario_asignado_id: admin.id,
+        creado_por: admin.id
       },
       {
         titulo: 'Documentación técnica general',
@@ -253,8 +253,8 @@ class TaskSeeder extends BaseSeeder {
         fecha_inicio: this.getDateMinusDays(this.getCurrentDate(), 10),
         fecha_fin: this.getDatePlusDays(this.getCurrentDate(), 20),
         proyecto_id: this.randomChoice(projects).id,
-        usuario_asignado_id: this.randomChoice(users).id,
-        creado_por: this.randomChoice(users).id
+        usuario_asignado_id: admin.id,
+        creado_por: admin.id
       }
     ];
 
