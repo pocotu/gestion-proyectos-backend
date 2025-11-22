@@ -97,12 +97,13 @@ async function renderDatabaseSetup() {
   }
   
   console.log('[SUCCESS] [RENDER-SETUP] Script de configuracion terminado exitosamente');
-  process.exit(0);
 }
 
 // Ejecutar solo si es llamado directamente
 if (require.main === module) {
-  renderDatabaseSetup();
+  renderDatabaseSetup()
+    .then(() => process.exit(0))
+    .catch(() => process.exit(1));
 }
 
 module.exports = { renderDatabaseSetup };

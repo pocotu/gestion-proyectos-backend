@@ -12,19 +12,12 @@ async function start() {
     await testConnection();
     logger.info('Database connection OK');
 
-    // Optional: create tables and seed defaults when requested (development convenience)
+    // Optional: setup database when requested
     if (process.env.SETUP_DB === 'true') {
-      logger.info('SETUP_DB=true detected — creating tables and seeding complete demo data');
-      await createAllTables();
-      
-      // Ejecutar seeders completos para datos de demostración
-      logger.info('Executing complete seeders for demo data...');
-      const SeederManager = require('./seeders');
-      const seederManager = new SeederManager();
-      await seederManager.runAll();
-      logger.info('Complete seeders executed successfully');
-      
-      logger.info('Database setup with demo data complete');
+      logger.info('SETUP_DB=true detected — running database setup');
+      const { renderDatabaseSetup } = require('../render-setup');
+      await renderDatabaseSetup();
+      logger.info('Database setup complete');
     }
 
     server = app.listen(config.PORT, () => {
