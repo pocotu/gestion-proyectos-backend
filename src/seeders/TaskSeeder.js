@@ -26,18 +26,20 @@ class TaskSeeder extends BaseSeeder {
       return;
     }
 
-    // Obtener usuarios para asignar como responsables
-    const users = await this.execute(`
+    // Obtener usuario admin para asignar tareas
+    const adminUser = await this.execute(`
       SELECT id, nombre, email 
       FROM usuarios 
-      WHERE es_administrador = 0 
-      ORDER BY id
+      WHERE es_administrador = 1 
+      LIMIT 1
     `);
 
-    if (users.length === 0) {
-      console.log('⚠️ No users found for task assignment');
+    if (adminUser.length === 0) {
+      console.log('⚠️ No admin user found for task assignment');
       return;
     }
+
+    const admin = adminUser[0];
 
     const createdTasks = [];
 
@@ -49,8 +51,8 @@ class TaskSeeder extends BaseSeeder {
         const taskId = await this.insertIfNotExists('tareas', {
           ...taskData,
           proyecto_id: project.id,
-          usuario_asignado_id: this.randomChoice(users).id,
-          creado_por: project.creado_por || this.randomChoice(users).id // Usar el mismo usuario que creó el proyecto o uno aleatorio
+          usuario_asignado_id: admin.id,
+          creado_por: admin.id
         }, ['titulo', 'proyecto_id']);
 
         if (taskId) {
@@ -60,7 +62,7 @@ class TaskSeeder extends BaseSeeder {
     }
 
     // Crear algunas tareas adicionales específicas
-    await this.createSpecificTasks(projects, users);
+    await this.createSpecificTasks(projects, admin);
 
     // Verificar que las tareas fueron creadas
     const totalTasks = await this.execute('SELECT COUNT(*) as count FROM tareas');

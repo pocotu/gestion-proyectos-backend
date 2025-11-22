@@ -18,19 +18,20 @@ class ProjectSeeder extends BaseSeeder {
    * Ejecuta el seeding de proyectos de ejemplo
    */
   async seed() {
-    // Obtener usuarios para asignar como responsables
-    const users = await this.execute(`
+    // Obtener usuario admin para asignar proyectos
+    const adminUser = await this.execute(`
       SELECT id, email 
       FROM usuarios 
-      WHERE es_administrador = 0 
-      ORDER BY id 
-      LIMIT 4
+      WHERE es_administrador = 1 
+      LIMIT 1
     `);
 
-    if (users.length === 0) {
-      console.log('⚠️ No users found for project assignment');
+    if (adminUser.length === 0) {
+      console.log('⚠️ No admin user found for project assignment');
       return;
     }
+
+    const adminId = adminUser[0].id;
 
     const projectsData = [
       // Proyectos EN PROGRESO (activos)
@@ -40,7 +41,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-01-15',
         fecha_fin: '2024-06-30',
         estado: 'en_progreso',
-        creado_por: users[0].id
+        creado_por: adminId
       },
       {
         titulo: 'Portal Web Corporativo',
@@ -48,7 +49,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-03-01',
         fecha_fin: '2024-07-31',
         estado: 'en_progreso',
-        creado_por: users[2] ? users[2].id : users[0].id
+        creado_por: adminId
       },
       {
         titulo: 'Sistema de Recursos Humanos',
@@ -56,7 +57,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-01-10',
         fecha_fin: '2024-12-31',
         estado: 'en_progreso',
-        creado_por: users[0].id
+        creado_por: adminId
       },
       {
         titulo: 'E-commerce Platform',
@@ -64,7 +65,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-02-20',
         fecha_fin: '2024-09-15',
         estado: 'en_progreso',
-        creado_por: users[1] ? users[1].id : users[0].id
+        creado_por: adminId
       },
       {
         titulo: 'Sistema de Facturación Electrónica',
@@ -72,7 +73,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-04-01',
         fecha_fin: '2024-11-30',
         estado: 'en_progreso',
-        creado_por: users[2] ? users[2].id : users[0].id
+        creado_por: adminId
       },
 
       // Proyectos EN PLANIFICACIÓN (activos)
@@ -82,7 +83,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-02-01',
         fecha_fin: '2024-08-15',
         estado: 'planificacion',
-        creado_por: users[1] ? users[1].id : users[0].id
+        creado_por: adminId
       },
       {
         titulo: 'API de Integración Bancaria',
@@ -90,7 +91,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-04-01',
         fecha_fin: '2024-09-30',
         estado: 'planificacion',
-        creado_por: users[1] ? users[1].id : users[0].id
+        creado_por: adminId
       },
       {
         titulo: 'Sistema de Business Intelligence',
@@ -98,7 +99,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-06-01',
         fecha_fin: '2025-02-28',
         estado: 'planificacion',
-        creado_por: users[0].id
+        creado_por: adminId
       },
       {
         titulo: 'App de Gestión de Proyectos Móvil',
@@ -106,7 +107,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-07-01',
         fecha_fin: '2024-12-15',
         estado: 'planificacion',
-        creado_por: users[2] ? users[2].id : users[0].id
+        creado_por: adminId
       },
 
       // Proyectos COMPLETADOS
@@ -116,7 +117,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-02-15',
         fecha_fin: '2024-05-30',
         estado: 'completado',
-        creado_por: users[2] ? users[2].id : users[0].id
+        creado_por: adminId
       },
       {
         titulo: 'Sistema de Autenticación SSO',
@@ -124,7 +125,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2023-11-01',
         fecha_fin: '2024-02-28',
         estado: 'completado',
-        creado_por: users[0].id
+        creado_por: adminId
       },
       {
         titulo: 'Migración a Cloud AWS',
@@ -132,17 +133,17 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2023-09-15',
         fecha_fin: '2024-01-31',
         estado: 'completado',
-        creado_por: users[1] ? users[1].id : users[0].id
+        creado_por: adminId
       },
 
-      // Proyecto EN PROGRESO (pausado → en_progreso)
+      // Proyecto EN PROGRESO
       {
         titulo: 'Sistema de IoT Industrial',
         descripcion: 'Plataforma para monitoreo y control de dispositivos IoT en entornos industriales.',
         fecha_inicio: '2024-03-15',
         fecha_fin: '2024-10-30',
-        estado: 'en_progreso', // Cambiar de 'pausado' a 'en_progreso'
-        creado_por: users[2] ? users[2].id : users[0].id
+        estado: 'en_progreso',
+        creado_por: adminId
       },
 
       // Proyecto CANCELADO
@@ -152,7 +153,7 @@ class ProjectSeeder extends BaseSeeder {
         fecha_inicio: '2024-01-01',
         fecha_fin: '2024-08-31',
         estado: 'cancelado',
-        creado_por: users[1] ? users[1].id : users[0].id
+        creado_por: adminId
       }
     ];
 
@@ -165,16 +166,12 @@ class ProjectSeeder extends BaseSeeder {
       if (projectId) {
         createdProjects.push({ id: projectId, ...projectData });
         
-        // Asignar responsables aleatorios a cada proyecto
-        const numResponsibles = this.randomInt(1, Math.min(3, users.length));
-        const selectedUsers = users.sort(() => 0.5 - Math.random()).slice(0, numResponsibles);
-        
-        for (const user of selectedUsers) {
-          await this.insertIfNotExists('proyecto_responsables', {
-            proyecto_id: projectId,
-            usuario_id: user.id
-          }, ['proyecto_id', 'usuario_id']);
-        }
+        // Asignar admin como responsable del proyecto
+        await this.insertIfNotExists('proyecto_responsables', {
+          proyecto_id: projectId,
+          usuario_id: adminId,
+          rol_responsabilidad: 'responsable_principal'
+        }, ['proyecto_id', 'usuario_id']);
       }
     }
 
