@@ -48,10 +48,26 @@ Para resetear la BD en Render:
 
 ## Tests
 
+### Resumen de Tests Backend (Integration con Jest)
+
+```
+[OK] Auth: 15/15
+[OK] Users: 21/21
+[OK] Projects: 34/34
+[OK] Tasks: 34/34
+[OK] Roles: 15/15
+[OK] Dashboard: 19/19
+
+Total Backend: 138 tests pasados sin errores
+```
+
+### Ejecutar Tests
+
 ```bash
 npm test                                    # Todos los tests
 npm test -- tests/integration/auth.test.js # Test especifico
 npm test -- --coverage                      # Con cobertura
+npm test -- --maxWorkers=4                  # Con mas workers
 ```
 
 ## Arquitectura
