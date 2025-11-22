@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS logs_actividad (
 );
 
 -- Indices
-CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email);
-CREATE INDEX IF NOT EXISTS idx_proyectos_creado_por ON proyectos(creado_por);
-CREATE INDEX IF NOT EXISTS idx_tareas_proyecto ON tareas(proyecto_id);
-CREATE INDEX IF NOT EXISTS idx_tareas_usuario ON tareas(usuario_asignado_id);
+CREATE INDEX idx_usuarios_email ON usuarios(email);
+CREATE INDEX idx_proyectos_creado_por ON proyectos(creado_por);
+CREATE INDEX idx_tareas_proyecto ON tareas(proyecto_id);
+CREATE INDEX idx_tareas_usuario ON tareas(usuario_asignado_id);

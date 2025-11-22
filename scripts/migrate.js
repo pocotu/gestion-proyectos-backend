@@ -143,9 +143,17 @@ class MigrationManager {
       ];
 
       for (const table of tables) {
-        console.log(`[DELETE] Limpiando tabla: ${table}`);
-        await connection.query(`DELETE FROM ${table}`);
-        await connection.query(`ALTER TABLE ${table} AUTO_INCREMENT = 1`);
+        try {
+          console.log(`[DELETE] Limpiando tabla: ${table}`);
+          await connection.query(`DELETE FROM ${table}`);
+          await connection.query(`ALTER TABLE ${table} AUTO_INCREMENT = 1`);
+        } catch (error) {
+          if (error.code === 'ER_NO_SUCH_TABLE') {
+            console.log(`[SKIP] Tabla ${table} no existe, omitiendo`);
+          } else {
+            throw error;
+          }
+        }
       }
 
       await connection.query('SET FOREIGN_KEY_CHECKS = 1');

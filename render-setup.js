@@ -32,20 +32,13 @@ async function renderDatabaseSetup() {
   console.log('[RENDER-SETUP] Host:', process.env.DB_HOST);
   
   try {
-    // Verificar conexión a la base de datos
-    console.log('[RENDER-SETUP] Verificando conexion a la base de datos...');
-    const connected = await testConnection();
-    
-    if (!connected) {
-      throw new Error('[ERROR] No se pudo conectar a la base de datos en Render');
-    }
-    
-    console.log('[SUCCESS] [RENDER-SETUP] Conexion a la base de datos establecida');
-    
-    // Ejecutar migraciones
+    // Ejecutar migraciones (esto crea la BD si no existe)
     console.log('[RENDER-SETUP] Ejecutando migraciones SQL...');
     const { MigrationManager } = require('./scripts/migrate');
     const migrationManager = new MigrationManager();
+    
+    // Asegurar que la base de datos existe
+    await migrationManager.ensureDatabase();
     
     // Limpiar base de datos si CLEAN_DATABASE=true
     if (process.env.CLEAN_DATABASE === 'true') {
@@ -56,6 +49,16 @@ async function renderDatabaseSetup() {
     
     await migrationManager.runMigrations();
     console.log('[SUCCESS] [RENDER-SETUP] Migraciones completadas');
+    
+    // Verificar conexión a la base de datos
+    console.log('[RENDER-SETUP] Verificando conexion a la base de datos...');
+    const connected = await testConnection();
+    
+    if (!connected) {
+      throw new Error('[ERROR] No se pudo conectar a la base de datos');
+    }
+    
+    console.log('[SUCCESS] [RENDER-SETUP] Conexion a la base de datos establecida');
     
     // Ejecutar seeders para datos de ejemplo
     console.log('[RENDER-SETUP] Ejecutando seeders para datos de ejemplo...');
