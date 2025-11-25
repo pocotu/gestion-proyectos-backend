@@ -2,6 +2,7 @@ const TaskRepository = require('../repositories/TaskRepository');
 const TaskAssignmentRepository = require('../repositories/TaskAssignmentRepository');
 const TaskCommentRepository = require('../repositories/TaskCommentRepository');
 const ProjectResponsibleRepository = require('../repositories/ProjectResponsibleRepository');
+const LogActivityRepository = require('../repositories/LogActivityRepository');
 
 /**
  * TaskService - Servicio para gestión de tareas
@@ -10,7 +11,7 @@ const ProjectResponsibleRepository = require('../repositories/ProjectResponsible
  * - Open/Closed: Abierto para extensión (nuevos métodos)
  * - Liskov Substitution: Puede ser sustituido por otros servicios
  * - Interface Segregation: Métodos específicos para cada operación
- * - Dependency Inversion: Depende de abstracciones (TaskRepository)
+ * - Dependency Inversion: Depende de abstracciones (TaskRepository, LogActivityRepository)
  */
 class TaskService {
   constructor() {
@@ -18,6 +19,7 @@ class TaskService {
     this.taskAssignmentRepository = new TaskAssignmentRepository();
     this.taskCommentRepository = new TaskCommentRepository();
     this.projectResponsibleRepository = new ProjectResponsibleRepository();
+    this.logActivityRepository = new LogActivityRepository();
   }
 
   /**
@@ -98,7 +100,7 @@ class TaskService {
   /**
    * Crear nueva tarea
    */
-  async createTask(taskData, createdBy) {
+  async createTask(taskData, createdBy, ipAddress = null) {
     try {
       // Verificar que el proyecto existe
       if (taskData.proyecto_id) {
@@ -117,6 +119,20 @@ class TaskService {
       // Obtener la tarea completa recién creada
       const newTask = await this.taskRepository.findById(result.id);
       
+      // Registrar actividad de creación (Principio de Responsabilidad Única)
+      try {
+        await this.logActivityRepository.logActivity({
+          usuario_id: createdBy,
+          accion: 'crear',
+          entidad_tipo: 'tarea',
+          entidad_id: result.id,
+          descripcion: `Tarea "${taskData.titulo}" creada`,
+          ip_address: ipAddress
+        });
+      } catch (logError) {
+        console.error('Error logging task creation:', logError);
+      }
+      
       return newTask;
     } catch (error) {
       console.error('Error en TaskService.createTask:', error);
@@ -127,7 +143,7 @@ class TaskService {
   /**
    * Actualizar tarea
    */
-  async updateTask(id, taskData, userId, isAdmin = false) {
+  async updateTask(id, taskData, userId, isAdmin = false, ipAddress = null) {
     try {
       const existingTask = await this.taskRepository.findById(id);
       if (!existingTask) {
@@ -159,6 +175,21 @@ class TaskService {
       }
 
       const updatedTask = await this.taskRepository.updateTask(id, taskData);
+      
+      // Registrar actividad de actualización (Principio de Responsabilidad Única)
+      try {
+        await this.logActivityRepository.logActivity({
+          usuario_id: userId,
+          accion: 'actualizar',
+          entidad_tipo: 'tarea',
+          entidad_id: id,
+          descripcion: `Tarea "${existingTask.titulo}" actualizada`,
+          ip_address: ipAddress
+        });
+      } catch (logError) {
+        console.error('Error logging task update:', logError);
+      }
+      
       return updatedTask;
     } catch (error) {
       console.error('Error en TaskService.updateTask:', error);

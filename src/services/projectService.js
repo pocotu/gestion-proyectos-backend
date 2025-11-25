@@ -1,6 +1,7 @@
 const ProjectRepository = require('../repositories/ProjectRepository');
 const ProjectResponsibleRepository = require('../repositories/ProjectResponsibleRepository');
 const UserRepository = require('../repositories/UserRepository');
+const LogActivityRepository = require('../repositories/LogActivityRepository');
 const { NotFoundError, ValidationError, ConflictError } = require('../utils/errors');
 
 /**
@@ -10,13 +11,14 @@ const { NotFoundError, ValidationError, ConflictError } = require('../utils/erro
  * - Open/Closed: Abierto para extensión (nuevos métodos)
  * - Liskov Substitution: Puede ser sustituido por otros servicios
  * - Interface Segregation: Métodos específicos para cada operación
- * - Dependency Inversion: Depende de abstracciones (ProjectRepository)
+ * - Dependency Inversion: Depende de abstracciones (ProjectRepository, LogActivityRepository)
  */
 class ProjectService {
   constructor() {
     this.projectRepository = new ProjectRepository();
     this.projectResponsibleRepository = new ProjectResponsibleRepository();
     this.userRepository = new UserRepository();
+    this.logActivityRepository = new LogActivityRepository();
   }
 
   /**
@@ -80,16 +82,33 @@ class ProjectService {
   /**
    * Crear nuevo proyecto
    */
-  async createProject(projectData, createdBy) {
+  async createProject(projectData, createdBy, ipAddress = null) {
     try {
       const dataToCreate = {
         ...projectData,
-        creado_por: createdBy,  // Cambiar created_by por creado_por
+        creado_por: createdBy,
         created_at: new Date(),
         updated_at: new Date()
       };
   
-      return await this.projectRepository.create(dataToCreate);
+      const project = await this.projectRepository.create(dataToCreate);
+      
+      // Registrar actividad de creación (Principio de Responsabilidad Única)
+      try {
+        await this.logActivityRepository.logActivity({
+          usuario_id: createdBy,
+          accion: 'crear',
+          entidad_tipo: 'proyecto',
+          entidad_id: project.id,
+          descripcion: `Proyecto "${projectData.titulo}" creado`,
+          ip_address: ipAddress
+        });
+      } catch (logError) {
+        console.error('Error logging project creation:', logError);
+        // No fallar la operación principal por errores de logging
+      }
+      
+      return project;
     } catch (error) {
       throw new Error(`Error creating project: ${error.message}`);
     }
@@ -98,7 +117,7 @@ class ProjectService {
   /**
    * Actualizar proyecto
    */
-  async updateProject(id, projectData, userId, isAdmin = false) {
+  async updateProject(id, projectData, userId, isAdmin = false, ipAddress = null) {
     try {
       const existingProject = await this.projectRepository.findById(id);
       if (!existingProject) {
@@ -122,6 +141,21 @@ class ProjectService {
       }
 
       const updatedProject = await this.projectRepository.updateById(id, projectData);
+      
+      // Registrar actividad de actualización (Principio de Responsabilidad Única)
+      try {
+        await this.logActivityRepository.logActivity({
+          usuario_id: userId,
+          accion: 'actualizar',
+          entidad_tipo: 'proyecto',
+          entidad_id: id,
+          descripcion: `Proyecto "${existingProject.titulo}" actualizado`,
+          ip_address: ipAddress
+        });
+      } catch (logError) {
+        console.error('Error logging project update:', logError);
+      }
+      
       return updatedProject;
     } catch (error) {
       console.error('Error en ProjectService.updateProject:', error);
@@ -208,7 +242,7 @@ class ProjectService {
   /**
    * Asignar responsable al proyecto
    */
-  async assignResponsible(projectId, userId, assignedBy) {
+  async assignResponsible(projectId, userId, assignedBy, ipAddress = null) {
     try {
       const project = await this.projectRepository.findById(projectId);
       if (!project) {
@@ -223,6 +257,22 @@ class ProjectService {
 
       // Llamar con los parámetros correctos: proyecto_id, usuario_id, rol_responsabilidad, asignado_por
       await this.projectResponsibleRepository.assignResponsible(projectId, userId, 'responsable_principal', assignedBy);
+      
+      // Registrar actividad de asignación (Principio de Responsabilidad Única)
+      try {
+        const assignedUser = await this.userRepository.findById(userId);
+        await this.logActivityRepository.logActivity({
+          usuario_id: assignedBy,
+          accion: 'asignar',
+          entidad_tipo: 'proyecto',
+          entidad_id: projectId,
+          descripcion: `Asignación de rol: responsable al usuario ${assignedUser?.nombre || 'ID: ' + userId} en proyecto "${project.titulo}"`,
+          ip_address: ipAddress
+        });
+      } catch (logError) {
+        console.error('Error logging responsible assignment:', logError);
+      }
+      
       return { message: 'Responsable asignado correctamente' };
     } catch (error) {
       console.error('Error en ProjectService.assignResponsible:', error);

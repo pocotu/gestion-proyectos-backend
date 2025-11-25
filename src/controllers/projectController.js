@@ -113,11 +113,14 @@ class ProjectController {
         projectData.fecha_fin = new Date(fecha_fin);
       }
 
-      const createdProject = await this.projectService.createProject(projectData, creado_por);
+      // Obtener IP del cliente
+      const ipAddress = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || null;
+      
+      const createdProject = await this.projectService.createProject(projectData, creado_por, ipAddress);
 
       // Si el usuario no es admin, asignarlo como responsable del proyecto
       if (!req.user.es_administrador) {
-        await this.projectService.assignResponsible(createdProject.id, creado_por, creado_por);
+        await this.projectService.assignResponsible(createdProject.id, creado_por, creado_por, ipAddress);
       }
 
       // Obtener el proyecto completo con todos sus campos
@@ -275,7 +278,10 @@ class ProjectController {
         }
       }
 
-      const updatedProject = await this.projectService.updateProject(projectId, updateData, userId, isAdmin);
+      // Obtener IP del cliente
+      const ipAddress = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || null;
+      
+      const updatedProject = await this.projectService.updateProject(projectId, updateData, userId, isAdmin, ipAddress);
 
       if (!updatedProject) {
         return res.status(404).json({
@@ -503,10 +509,14 @@ class ProjectController {
         }
       }
 
+      // Obtener IP del cliente
+      const ipAddress = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || null;
+      
       const result = await this.projectService.assignResponsible(
         projectId, 
         responsibleUserId, 
-        assignedBy
+        assignedBy,
+        ipAddress
       );
 
       res.status(201).json({

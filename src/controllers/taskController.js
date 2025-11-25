@@ -136,7 +136,10 @@ class TaskController {
         creado_por
       };
 
-      const result = await this.taskService.createTask(taskData, creado_por);
+      // Obtener IP del cliente
+      const ipAddress = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || null;
+      
+      const result = await this.taskService.createTask(taskData, creado_por, ipAddress);
 
       res.status(201).json({
         success: true,
@@ -326,7 +329,10 @@ class TaskController {
         }
       }
 
-      const updatedTask = await this.taskService.updateTask(taskId, updateData, userId, isAdmin);
+      // Obtener IP del cliente
+      const ipAddress = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || null;
+      
+      const updatedTask = await this.taskService.updateTask(taskId, updateData, userId, isAdmin, ipAddress);
 
       if (!updatedTask) {
         return res.status(404).json({
