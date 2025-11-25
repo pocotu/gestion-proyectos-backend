@@ -357,7 +357,10 @@ class UserService {
       if (typeof sanitizedUser.estado === 'boolean') {
         sanitizedUser.estado = sanitizedUser.estado ? 'activo' : 'inactivo';
       } else if (typeof sanitizedUser.estado === 'number') {
-        sanitizedUser.estado = sanitizedUser.estado ? 'activo' : 'inactivo';
+        sanitizedUser.estado = sanitizedUser.estado === 1 ? 'activo' : 'inactivo';
+      } else if (typeof sanitizedUser.estado === 'string') {
+        // Si ya es string, normalizarlo
+        sanitizedUser.estado = (sanitizedUser.estado === 'activo' || sanitizedUser.estado === 'true' || sanitizedUser.estado === '1') ? 'activo' : 'inactivo';
       }
     }
     

@@ -181,7 +181,7 @@ class UserController {
   async updateUser(req, res) {
     try {
       const userId = parseInt(req.params.id);
-      const { nombre, telefono, estado, es_administrador } = req.body;
+      const { nombre, email, telefono, estado, es_administrador, roles } = req.body;
 
       // Validar datos
       if (!nombre || nombre.trim().length === 0) {
@@ -196,10 +196,15 @@ class UserController {
         telefono: telefono?.trim() || null
       };
 
+      // Agregar email si se proporciona
+      if (email) {
+        updateData.email = email.trim();
+      }
+
       // Solo admin puede cambiar estado y permisos de administrador
       if (req.user.es_administrador) {
         if (estado !== undefined) {
-          updateData.estado = estado;
+          updateData.estado = estado === 'activo' || estado === true;
         }
         if (es_administrador !== undefined) {
           updateData.es_administrador = es_administrador;
@@ -215,6 +220,26 @@ class UserController {
         });
       }
 
+      // Actualizar roles si se proporcionan
+      if (roles !== undefined && Array.isArray(roles) && req.user.es_administrador) {
+        const UserRoleRepository = require('../repositories/UserRoleRepository');
+        const RoleRepository = require('../repositories/RoleRepository');
+        const userRoleRepository = new UserRoleRepository();
+        const roleRepository = new RoleRepository();
+
+        // Mapear nombres de roles a IDs
+        const roleIds = [];
+        for (const roleName of roles) {
+          const role = await roleRepository.findByName(roleName);
+          if (role) {
+            roleIds.push(role.id);
+          }
+        }
+
+        // Sincronizar roles
+        await userRoleRepository.syncUserRoles(userId, roleIds);
+      }
+
       res.json({
         success: true,
         message: 'Usuario actualizado exitosamente',
@@ -225,7 +250,7 @@ class UserController {
       console.error('Error actualizando usuario:', error);
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor'
+        message: error.message || 'Error interno del servidor'
       });
     }
   }
@@ -407,7 +432,7 @@ class UserController {
   async changeUserStatus(req, res) {
     try {
       const userId = parseInt(req.params.id);
-      const { estado } = req.body;
+      let { estado } = req.body;
       const currentUserId = req.user.id;
 
       // No permitir que un usuario se desactive a sí mismo
@@ -418,12 +443,13 @@ class UserController {
         });
       }
 
-      if (!['activo', 'inactivo'].includes(estado)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Estado inválido. Debe ser "activo" o "inactivo"'
-        });
+      // Normalizar el estado a booleano
+      if (typeof estado === 'string') {
+        estado = estado === 'activo' || estado === 'true' || estado === '1';
+      } else if (typeof estado === 'number') {
+        estado = estado === 1;
       }
+      // Si ya es booleano, se mantiene como está
 
       const updatedUser = await this.userService.updateUser(userId, { estado });
 
@@ -436,7 +462,7 @@ class UserController {
 
       res.json({
         success: true,
-        message: `Usuario ${estado === 'activo' ? 'activado' : 'desactivado'} exitosamente`,
+        message: `Usuario ${estado ? 'activado' : 'desactivado'} exitosamente`,
         data: { user: updatedUser }
       });
 
