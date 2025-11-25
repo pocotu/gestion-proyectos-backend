@@ -150,7 +150,7 @@ class ProjectService {
       // Verificar si el proyecto tiene tareas asociadas
       const tasks = await this.projectRepository.getProjectTasks(id);
       if (tasks && tasks.length > 0) {
-        throw new Error('No se puede eliminar un proyecto con tareas asociadas. Elimina las tareas primero.');
+        throw new ValidationError('No se puede eliminar un proyecto con tareas asociadas. Elimina las tareas primero.');
       }
 
       // Eliminar el proyecto (CASCADE eliminará automáticamente responsables y archivos)

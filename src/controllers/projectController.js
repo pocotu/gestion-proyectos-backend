@@ -350,7 +350,7 @@ class ProjectController {
       console.error('Error eliminando proyecto:', error);
       
       // Manejar errores específicos
-      if (error.statusCode === 400) {
+      if (error.name === 'ValidationError' || error.statusCode === 400) {
         return res.status(400).json({
           success: false,
           message: error.message
