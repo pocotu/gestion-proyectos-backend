@@ -485,6 +485,87 @@ class LogActivityRepository extends BaseRepository {
       datos_nuevos: log.datos_nuevos ? JSON.parse(log.datos_nuevos) : null
     }));
   }
+
+  /**
+   * Obtener estadísticas del sistema para un período de días
+   * Principio de Responsabilidad Única: Solo obtiene estadísticas del sistema
+   */
+  async getSystemStats(days = 30) {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+
+      // Total de actividades en el período
+      const [totalResult] = await this.raw(`
+        SELECT COUNT(*) as total
+        FROM logs_actividad
+        WHERE created_at >= ?
+      `, [cutoffDate]);
+
+      // Actividades por acción
+      const byAction = await this.raw(`
+        SELECT 
+          accion,
+          COUNT(*) as total
+        FROM logs_actividad
+        WHERE created_at >= ?
+        GROUP BY accion
+        ORDER BY total DESC
+      `, [cutoffDate]);
+
+      // Actividades por tipo de entidad
+      const byEntity = await this.raw(`
+        SELECT 
+          entidad_tipo,
+          COUNT(*) as total
+        FROM logs_actividad
+        WHERE created_at >= ?
+        GROUP BY entidad_tipo
+        ORDER BY total DESC
+      `, [cutoffDate]);
+
+      // Usuarios más activos
+      const topUsers = await this.raw(`
+        SELECT 
+          COALESCE(u.nombre, 'Sistema') as usuario_nombre,
+          COALESCE(u.email, 'sistema@interno') as usuario_email,
+          COUNT(la.id) as total_activities
+        FROM logs_actividad la
+        LEFT JOIN usuarios u ON la.usuario_id = u.id
+        WHERE la.created_at >= ?
+        GROUP BY la.usuario_id, u.nombre, u.email
+        ORDER BY total_activities DESC
+        LIMIT 10
+      `, [cutoffDate]);
+
+      // Actividades por día
+      const byDay = await this.raw(`
+        SELECT 
+          DATE(created_at) as fecha,
+          COUNT(*) as total
+        FROM logs_actividad
+        WHERE created_at >= ?
+        GROUP BY DATE(created_at)
+        ORDER BY fecha DESC
+      `, [cutoffDate]);
+
+      return {
+        period: {
+          days,
+          startDate: cutoffDate,
+          endDate: new Date()
+        },
+        total: totalResult.total,
+        byAction,
+        byEntity,
+        topUsers,
+        byDay
+      };
+    } catch (error) {
+      console.error('Error en getSystemStats:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = LogActivityRepository;
