@@ -139,17 +139,6 @@ class ProjectService {
         throw new NotFoundError('Proyecto no encontrado');
       }
 
-      // Verificar si el proyecto tiene tareas asociadas
-      const TaskRepository = require('../repositories/TaskRepository');
-      const taskRepository = new TaskRepository();
-      const tasks = await taskRepository.findByProject(id, false);
-      
-      if (tasks && tasks.length > 0) {
-        const error = new Error('No se puede eliminar un proyecto que tiene tareas asociadas');
-        error.statusCode = 400;
-        throw error;
-      }
-
       // Verificar acceso si no es admin
       if (!isAdmin) {
         const hasAccess = await this.projectRepository.hasUserAccess(id, userId);
@@ -158,11 +147,13 @@ class ProjectService {
         }
       }
 
+      // Eliminar el proyecto (CASCADE eliminará automáticamente tareas, responsables y archivos)
       const deletedRows = await this.projectRepository.deleteById(id);
       if (deletedRows === 0) {
         throw new Error('No se pudo eliminar el proyecto');
       }
       
+      console.log(`Proyecto ${id} eliminado exitosamente (incluyendo tareas y relaciones en cascada)`);
       return { message: 'Proyecto eliminado correctamente' };
     } catch (error) {
       console.error('Error en ProjectService.deleteProject:', error);

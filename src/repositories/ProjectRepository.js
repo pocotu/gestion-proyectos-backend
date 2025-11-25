@@ -833,6 +833,24 @@ class ProjectRepository extends BaseRepository {
       throw error;
     }
   }
+
+  /**
+   * Eliminar todos los responsables de un proyecto
+   */
+  async removeAllResponsibles(projectId) {
+    try {
+      const query = `
+        DELETE FROM proyecto_responsables 
+        WHERE proyecto_id = ?
+      `;
+      
+      const [result] = await pool.execute(query, [projectId]);
+      return result.affectedRows;
+    } catch (error) {
+      console.error('Error en ProjectRepository.removeAllResponsibles:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = ProjectRepository;

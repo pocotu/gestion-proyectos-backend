@@ -77,33 +77,41 @@ class ProjectController {
       const { titulo, descripcion, fecha_inicio, fecha_fin } = req.body;
       const creado_por = req.user.id;
 
-      // Validar datos requeridos
-      if (!titulo || !descripcion || !fecha_inicio || !fecha_fin) {
+      // Validar datos requeridos (solo título y descripción son obligatorios)
+      if (!titulo || !descripcion) {
         return res.status(400).json({
           success: false,
-          message: 'Título, descripción, fecha de inicio y fecha de fin son requeridos'
+          message: 'Título y descripción son requeridos'
         });
       }
 
-      // Validar fechas
-      const fechaInicio = new Date(fecha_inicio);
-      const fechaFin = new Date(fecha_fin);
-
-      if (fechaInicio >= fechaFin) {
-        return res.status(400).json({
-          success: false,
-          message: 'La fecha de fin debe ser posterior a la fecha de inicio'
-        });
-      }
-
+      // Preparar datos del proyecto
       const projectData = {
         titulo: titulo.trim(),
         descripcion: descripcion.trim(),
-        fecha_inicio: fechaInicio,
-        fecha_fin: fechaFin,
         estado: 'planificacion',
         creado_por
       };
+
+      // Validar y agregar fechas si están presentes
+      if (fecha_inicio && fecha_fin) {
+        const fechaInicio = new Date(fecha_inicio);
+        const fechaFin = new Date(fecha_fin);
+
+        if (fechaInicio >= fechaFin) {
+          return res.status(400).json({
+            success: false,
+            message: 'La fecha de fin debe ser posterior a la fecha de inicio'
+          });
+        }
+
+        projectData.fecha_inicio = fechaInicio;
+        projectData.fecha_fin = fechaFin;
+      } else if (fecha_inicio) {
+        projectData.fecha_inicio = new Date(fecha_inicio);
+      } else if (fecha_fin) {
+        projectData.fecha_fin = new Date(fecha_fin);
+      }
 
       const createdProject = await this.projectService.createProject(projectData, creado_por);
 
