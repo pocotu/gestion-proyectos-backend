@@ -52,19 +52,26 @@ class LogActivityRepository extends BaseRepository {
 
   /**
    * Obtiene actividades por usuario con información relacionada
+   * Principio de Responsabilidad Única: Solo obtiene actividades por usuario
+   * Maneja casos donde el usuario fue eliminado
    */
   async getByUser(userId, page = 1, limit = 50) {
     try {
       const offset = (page - 1) * limit;
+      const sanitizedLimit = Math.max(1, Math.min(parseInt(limit) || 50, 100));
+      const sanitizedOffset = Math.max(0, parseInt(offset) || 0);
       
-      const results = await this
-        .select('la.*, u.nombre as usuario_nombre, u.email as usuario_email')
-        .from('logs_actividad la')
-        .leftJoin('usuarios u', 'la.usuario_id', 'u.id')
-        .where('la.usuario_id', userId)
-        .orderBy('la.created_at', 'DESC')
-        .limit(limit, offset)
-        .get();
+      const results = await this.raw(`
+        SELECT 
+          la.*,
+          COALESCE(u.nombre, 'Usuario Eliminado') as usuario_nombre,
+          COALESCE(u.email, 'eliminado@sistema') as usuario_email
+        FROM logs_actividad la
+        LEFT JOIN usuarios u ON la.usuario_id = u.id
+        WHERE la.usuario_id = ?
+        ORDER BY la.created_at DESC
+        LIMIT ${sanitizedOffset}, ${sanitizedLimit}
+      `, [userId]);
       
       return results;
     } catch (error) {
@@ -75,6 +82,8 @@ class LogActivityRepository extends BaseRepository {
 
   /**
    * Obtiene actividades por entidad específica
+   * Principio de Responsabilidad Única: Solo obtiene actividades por entidad
+   * Maneja casos donde el usuario fue eliminado o es NULL
    */
   async getByEntity(entidad_tipo, entidad_id, limit = 50, offset = 0) {
     const sanitizedLimit = Math.max(1, Math.min(parseInt(limit) || 50, 100));
@@ -83,8 +92,8 @@ class LogActivityRepository extends BaseRepository {
     return await this.raw(`
       SELECT 
         logs_actividad.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
+        COALESCE(usuarios.nombre, 'Sistema') as usuario_nombre,
+        COALESCE(usuarios.email, 'sistema@interno') as usuario_email
       FROM logs_actividad
       LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
       WHERE logs_actividad.entidad_tipo = ? AND logs_actividad.entidad_id = ?
@@ -95,40 +104,52 @@ class LogActivityRepository extends BaseRepository {
 
   /**
    * Obtiene actividades por tipo de acción
+   * Principio de Responsabilidad Única: Solo obtiene actividades por acción
+   * Maneja casos donde el usuario fue eliminado o es NULL
    */
   async getByAction(accion, limit = 50, offset = 0) {
-    return await this
-      .select(`
+    const sanitizedLimit = Math.max(1, Math.min(parseInt(limit) || 50, 100));
+    const sanitizedOffset = Math.max(0, parseInt(offset) || 0);
+    
+    return await this.raw(`
+      SELECT 
         logs_actividad.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
-      .where('logs_actividad.accion', accion)
-      .orderBy('logs_actividad.created_at', 'DESC')
-      .limit(limit, offset)
-      .get();
+        COALESCE(usuarios.nombre, 'Sistema') as usuario_nombre,
+        COALESCE(usuarios.email, 'sistema@interno') as usuario_email
+      FROM logs_actividad
+      LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
+      WHERE logs_actividad.accion = ?
+      ORDER BY logs_actividad.created_at DESC
+      LIMIT ${sanitizedOffset}, ${sanitizedLimit}
+    `, [accion]);
   }
 
   /**
    * Obtiene actividades por rango de fechas
+   * Principio de Responsabilidad Única: Solo obtiene actividades por rango de fechas
+   * Maneja casos donde el usuario fue eliminado o es NULL
    */
   async getByDateRange(fecha_inicio, fecha_fin, limit = 50, offset = 0) {
-    return await this
-      .select(`
+    const sanitizedLimit = Math.max(1, Math.min(parseInt(limit) || 50, 100));
+    const sanitizedOffset = Math.max(0, parseInt(offset) || 0);
+    
+    return await this.raw(`
+      SELECT 
         logs_actividad.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
-      .whereBetween('logs_actividad.created_at', fecha_inicio, fecha_fin)
-      .orderBy('logs_actividad.created_at', 'DESC')
-      .limit(limit, offset)
-      .get();
+        COALESCE(usuarios.nombre, 'Sistema') as usuario_nombre,
+        COALESCE(usuarios.email, 'sistema@interno') as usuario_email
+      FROM logs_actividad
+      LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
+      WHERE logs_actividad.created_at BETWEEN ? AND ?
+      ORDER BY logs_actividad.created_at DESC
+      LIMIT ${sanitizedOffset}, ${sanitizedLimit}
+    `, [fecha_inicio, fecha_fin]);
   }
 
   /**
    * Obtiene actividades recientes del sistema
+   * Principio de Responsabilidad Única: Solo obtiene actividades recientes
+   * Maneja casos donde el usuario fue eliminado o es NULL
    */
   async getRecentActivities(limit = 20) {
     // Validar y sanitizar limit para evitar SQL injection
@@ -137,8 +158,8 @@ class LogActivityRepository extends BaseRepository {
     return await this.raw(`
       SELECT 
         logs_actividad.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
+        COALESCE(usuarios.nombre, 'Sistema') as usuario_nombre,
+        COALESCE(usuarios.email, 'sistema@interno') as usuario_email
       FROM logs_actividad
       LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
       ORDER BY logs_actividad.created_at DESC
@@ -183,6 +204,8 @@ class LogActivityRepository extends BaseRepository {
 
   /**
    * Obtiene el historial de cambios de una entidad específica
+   * Principio de Responsabilidad Única: Solo obtiene historial de entidad
+   * Maneja casos donde el usuario fue eliminado o es NULL
    */
   async getEntityHistory(entidad_tipo, entidad_id, limit = 50, offset = 0) {
     const sanitizedLimit = Math.max(1, Math.min(parseInt(limit) || 50, 100));
@@ -191,8 +214,8 @@ class LogActivityRepository extends BaseRepository {
     return await this.raw(`
       SELECT 
         logs_actividad.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
+        COALESCE(usuarios.nombre, 'Sistema') as usuario_nombre,
+        COALESCE(usuarios.email, 'sistema@interno') as usuario_email
       FROM logs_actividad
       LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
       WHERE logs_actividad.entidad_tipo = ? AND logs_actividad.entidad_id = ?
@@ -203,36 +226,46 @@ class LogActivityRepository extends BaseRepository {
 
   /**
    * Busca actividades por descripción
+   * Principio de Responsabilidad Única: Solo busca actividades por descripción
+   * Maneja casos donde el usuario fue eliminado o es NULL
    */
   async searchActivities(searchTerm, limit = 50, offset = 0) {
-    return await this
-      .select(`
+    const sanitizedLimit = Math.max(1, Math.min(parseInt(limit) || 50, 100));
+    const sanitizedOffset = Math.max(0, parseInt(offset) || 0);
+    
+    return await this.raw(`
+      SELECT 
         logs_actividad.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
-      .where('logs_actividad.descripcion', 'LIKE', `%${searchTerm}%`)
-      .orderBy('logs_actividad.created_at', 'DESC')
-      .limit(limit, offset)
-      .get();
+        COALESCE(usuarios.nombre, 'Sistema') as usuario_nombre,
+        COALESCE(usuarios.email, 'sistema@interno') as usuario_email
+      FROM logs_actividad
+      LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
+      WHERE logs_actividad.descripcion LIKE ?
+      ORDER BY logs_actividad.created_at DESC
+      LIMIT ${sanitizedOffset}, ${sanitizedLimit}
+    `, [`%${searchTerm}%`]);
   }
 
   /**
    * Obtiene actividades por IP
+   * Principio de Responsabilidad Única: Solo obtiene actividades por IP
+   * Maneja casos donde el usuario fue eliminado o es NULL
    */
   async getByIpAddress(ip_address, limit = 50, offset = 0) {
-    return await this
-      .select(`
+    const sanitizedLimit = Math.max(1, Math.min(parseInt(limit) || 50, 100));
+    const sanitizedOffset = Math.max(0, parseInt(offset) || 0);
+    
+    return await this.raw(`
+      SELECT 
         logs_actividad.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
-      .where('logs_actividad.ip_address', ip_address)
-      .orderBy('logs_actividad.created_at', 'DESC')
-      .limit(limit, offset)
-      .get();
+        COALESCE(usuarios.nombre, 'Sistema') as usuario_nombre,
+        COALESCE(usuarios.email, 'sistema@interno') as usuario_email
+      FROM logs_actividad
+      LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
+      WHERE logs_actividad.ip_address = ?
+      ORDER BY logs_actividad.created_at DESC
+      LIMIT ${sanitizedOffset}, ${sanitizedLimit}
+    `, [ip_address]);
   }
 
   /**
@@ -302,24 +335,32 @@ class LogActivityRepository extends BaseRepository {
 
   /**
    * Obtiene actividades en un rango de fechas
+   * Principio de Responsabilidad Única: Solo obtiene actividades en rango de fechas
+   * Maneja casos donde el usuario fue eliminado o es NULL
    */
   async getActivitiesInDateRange(startDate, endDate, usuario_id = null) {
-    let query = this
-      .select(`
+    const baseQuery = `
+      SELECT 
         logs_actividad.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
-      .whereBetween('logs_actividad.created_at', [startDate, endDate]);
-
+        COALESCE(usuarios.nombre, 'Sistema') as usuario_nombre,
+        COALESCE(usuarios.email, 'sistema@interno') as usuario_email
+      FROM logs_actividad
+      LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
+      WHERE logs_actividad.created_at BETWEEN ? AND ?
+    `;
+    
     if (usuario_id) {
-      query = query.where('logs_actividad.usuario_id', usuario_id);
+      return await this.raw(`
+        ${baseQuery}
+        AND logs_actividad.usuario_id = ?
+        ORDER BY logs_actividad.created_at ASC
+      `, [startDate, endDate, usuario_id]);
     }
-
-    return await query
-      .orderBy('logs_actividad.created_at', 'ASC')
-      .get();
+    
+    return await this.raw(`
+      ${baseQuery}
+      ORDER BY logs_actividad.created_at ASC
+    `, [startDate, endDate]);
   }
 
   /**
@@ -409,24 +450,33 @@ class LogActivityRepository extends BaseRepository {
 
   /**
    * Exporta logs para auditoría
+   * Principio de Responsabilidad Única: Solo exporta logs para auditoría
+   * Maneja casos donde el usuario fue eliminado o es NULL
    */
   async exportLogsForAudit(startDate, endDate, usuario_id = null) {
-    let query = this
-      .select(`
+    const baseQuery = `
+      SELECT 
         logs_actividad.*,
-        usuarios.nombre as usuario_nombre,
-        usuarios.email as usuario_email
-      `)
-      .leftJoin('usuarios', 'logs_actividad.usuario_id', 'usuarios.id')
-      .whereBetween('logs_actividad.created_at', [startDate, endDate]);
-
+        COALESCE(usuarios.nombre, 'Sistema') as usuario_nombre,
+        COALESCE(usuarios.email, 'sistema@interno') as usuario_email
+      FROM logs_actividad
+      LEFT JOIN usuarios ON logs_actividad.usuario_id = usuarios.id
+      WHERE logs_actividad.created_at BETWEEN ? AND ?
+    `;
+    
+    let logs;
     if (usuario_id) {
-      query = query.where('logs_actividad.usuario_id', usuario_id);
+      logs = await this.raw(`
+        ${baseQuery}
+        AND logs_actividad.usuario_id = ?
+        ORDER BY logs_actividad.created_at ASC
+      `, [startDate, endDate, usuario_id]);
+    } else {
+      logs = await this.raw(`
+        ${baseQuery}
+        ORDER BY logs_actividad.created_at ASC
+      `, [startDate, endDate]);
     }
-
-    const logs = await query
-      .orderBy('logs_actividad.created_at', 'ASC')
-      .get();
 
     // Parsear los datos JSON para la exportación
     return logs.map(log => ({
