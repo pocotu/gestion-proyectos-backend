@@ -13,5 +13,23 @@ module.exports = {
   testSequencer: '<rootDir>/node_modules/@jest/test-sequencer/build/index.js',
   globals: {
     'jest': true
+  },
+  // Coverage configuration
+  collectCoverageFrom: [
+    'src/**/*.js',
+    '!src/server.js',
+    '!src/seeders/**',
+    '!src/config/**',
+    '!src/utils/logger.js'
+  ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
+  coverageThreshold: {
+    global: {
+      branches: 50,
+      functions: 50,
+      lines: 50,
+      statements: 50
+    }
   }
 };
