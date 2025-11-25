@@ -147,13 +147,19 @@ class ProjectService {
         }
       }
 
-      // Eliminar el proyecto (CASCADE eliminará automáticamente tareas, responsables y archivos)
+      // Verificar si el proyecto tiene tareas asociadas
+      const tasks = await this.projectRepository.getProjectTasks(id);
+      if (tasks && tasks.length > 0) {
+        throw new Error('No se puede eliminar un proyecto con tareas asociadas. Elimina las tareas primero.');
+      }
+
+      // Eliminar el proyecto (CASCADE eliminará automáticamente responsables y archivos)
       const deletedRows = await this.projectRepository.deleteById(id);
       if (deletedRows === 0) {
         throw new Error('No se pudo eliminar el proyecto');
       }
       
-      console.log(`Proyecto ${id} eliminado exitosamente (incluyendo tareas y relaciones en cascada)`);
+      console.log(`Proyecto ${id} eliminado exitosamente (incluyendo relaciones en cascada)`);
       return { message: 'Proyecto eliminado correctamente' };
     } catch (error) {
       console.error('Error en ProjectService.deleteProject:', error);
