@@ -259,8 +259,8 @@ class AuthService {
       }
 
       // Validar nueva contraseña
-      if (!newPassword || newPassword.length < 8) {
-        throw new Error('La nueva contraseña debe tener al menos 8 caracteres');
+      if (!newPassword || newPassword.length < 12) {
+        throw new Error('La nueva contraseña debe tener al menos 12 caracteres');
       }
 
       // Hash de la nueva contraseña
