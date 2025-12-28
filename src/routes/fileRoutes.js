@@ -2,16 +2,16 @@ const express = require('express');
 const FileController = require('../controllers/fileController');
 const config = require('../config/config');
 const { authenticate } = require('../middleware/authMiddleware');
-const { 
-  requirePermission, 
+const {
+  requirePermission,
   requireFileManagement,
   requireOwnershipOrPermission,
-  attachPermissions 
+  attachPermissions
 } = require('../middleware/permissionMiddleware');
-const { 
-  requireFileAccess, 
-  requireTaskFileAccess, 
-  requireProjectFileAccess 
+const {
+  requireFileAccess,
+  requireTaskFileAccess,
+  requireProjectFileAccess
 } = require('../middleware/granularAccessMiddleware');
 
 const router = express.Router();
@@ -30,10 +30,16 @@ router.use(attachPermissions());
  * Rutas principales de archivos
  */
 
+// Obtener todos los archivos accesibles para el usuario
+// GET /api/files
+// Permisos: Usuario autenticado (archivos filtrados por permisos)
+// NOTA: Debe estar ANTES de las rutas con parámetros dinámicos
+router.get('/', fileController.getAllFilesForUser.bind(fileController));
+
 // Subir archivo a una tarea
 // POST /api/files/upload/:taskId
 // Permisos: Solo asignados a la tarea, responsables del proyecto y admin
-router.post('/upload/:taskId', 
+router.post('/upload/:taskId',
   requireTaskFileAccess(),
   fileController.uploadFile.bind(fileController)
 );
@@ -41,7 +47,7 @@ router.post('/upload/:taskId',
 // Obtener archivos de una tarea
 // GET /api/files/task/:taskId
 // Permisos: Solo asignados a la tarea, responsables del proyecto y admin
-router.get('/task/:taskId', 
+router.get('/task/:taskId',
   requireTaskFileAccess(),
   fileController.getTaskFiles.bind(fileController)
 );
@@ -53,10 +59,10 @@ router.get('/task/:taskId',
 // Validar archivo antes de subir
 // POST /api/files/validate
 // Permisos: Usuario autenticado
-router.post('/validate', 
+router.post('/validate',
   (req, res) => {
     const { filename, size, mimetype } = req.body;
-    
+
     if (!filename || !size || !mimetype) {
       return res.status(400).json({
         success: false,
@@ -96,7 +102,7 @@ router.post('/validate',
 // Obtener tipos de archivo permitidos
 // GET /api/files/allowed-types
 // Permisos: Usuario autenticado
-router.get('/allowed-types', 
+router.get('/allowed-types',
   (req, res) => {
     const allowedTypes = {
       images: ['image/jpeg', 'image/png', 'image/gif'],
@@ -122,7 +128,7 @@ router.get('/allowed-types',
 // Descargar archivo
 // GET /api/files/download/:fileId
 // Permisos: Solo quien subió el archivo, responsables del proyecto y admin
-router.get('/download/:fileId', 
+router.get('/download/:fileId',
   requireFileAccess('read'),
   fileController.downloadFile.bind(fileController)
 );
@@ -130,7 +136,7 @@ router.get('/download/:fileId',
 // Obtener información de un archivo
 // GET /api/files/:fileId
 // Permisos: Solo quien subió el archivo, responsables del proyecto y admin
-router.get('/:fileId', 
+router.get('/:fileId',
   requireFileAccess('read'),
   fileController.getFileInfo.bind(fileController)
 );
@@ -138,7 +144,7 @@ router.get('/:fileId',
 // Actualizar información de archivo
 // PUT /api/files/:fileId
 // Permisos: Solo quien subió el archivo, responsables del proyecto y admin
-router.put('/:fileId', 
+router.put('/:fileId',
   requireFileAccess('update'),
   fileController.updateFileInfo.bind(fileController)
 );
@@ -146,7 +152,7 @@ router.put('/:fileId',
 // Eliminar archivo
 // DELETE /api/files/:fileId
 // Permisos: Solo quien subió el archivo, responsables del proyecto y admin
-router.delete('/:fileId', 
+router.delete('/:fileId',
   requireFileAccess('delete'),
   fileController.deleteFile.bind(fileController)
 );
@@ -158,7 +164,7 @@ router.delete('/:fileId',
 // Obtener mis archivos subidos
 // GET /api/files/my-files
 // Permisos: Usuario autenticado (sus propios archivos)
-router.get('/my-files', 
+router.get('/my-files',
   fileController.getMyFiles.bind(fileController)
 );
 
@@ -169,14 +175,14 @@ router.get('/my-files',
 // Obtener estadísticas de archivos
 // GET /api/files/stats/overview
 // Permisos: Admin o filtrado según acceso del usuario
-router.get('/stats/overview', 
+router.get('/stats/overview',
   fileController.getFileStats.bind(fileController)
 );
 
 // Obtener estadísticas de mis archivos
 // GET /api/files/stats/my-stats
 // Permisos: Usuario autenticado (sus propias estadísticas)
-router.get('/stats/my-stats', 
+router.get('/stats/my-stats',
   (req, res, next) => {
     req.query.user_specific = 'true';
     next();
@@ -191,7 +197,7 @@ router.get('/stats/my-stats',
 // Buscar archivos
 // GET /api/files/search
 // Permisos: Filtrado según acceso del usuario
-router.get('/search', 
+router.get('/search',
   (req, res, next) => {
     const { q, tipo_mime, tarea_id } = req.query;
     req.searchQuery = q;
@@ -203,7 +209,7 @@ router.get('/search',
 // Obtener archivos por tipo MIME
 // GET /api/files/by-type/:mimeType
 // Permisos: Filtrado según acceso del usuario
-router.get('/by-type/:mimeType', 
+router.get('/by-type/:mimeType',
   (req, res, next) => {
     req.query.tipo_mime = req.params.mimeType;
     next();
@@ -214,7 +220,7 @@ router.get('/by-type/:mimeType',
 // Obtener archivos recientes
 // GET /api/files/recent
 // Permisos: Filtrado según acceso del usuario
-router.get('/recent', 
+router.get('/recent',
   (req, res, next) => {
     req.query.recent = 'true';
     req.query.limit = req.query.limit || '10';
@@ -230,7 +236,7 @@ router.get('/recent',
 // Obtener todos los archivos (solo admin)
 // GET /api/files/admin/all
 // Permisos: Solo Admin
-router.get('/admin/all', 
+router.get('/admin/all',
   requirePermission('files', 'read'),
   (req, res, next) => {
     // Verificar que es admin
@@ -248,7 +254,7 @@ router.get('/admin/all',
 // Limpiar archivos huérfanos (sin tarea asociada)
 // DELETE /api/files/admin/cleanup-orphans
 // Permisos: Solo Admin
-router.delete('/admin/cleanup-orphans', 
+router.delete('/admin/cleanup-orphans',
   requirePermission('files', 'delete'),
   (req, res, next) => {
     // Verificar que es admin

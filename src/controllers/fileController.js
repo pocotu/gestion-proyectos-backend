@@ -89,7 +89,7 @@ class FileController {
       const ProjectRepository = require('../repositories/ProjectRepository');
       const projectRepository = new ProjectRepository();
       const project = await projectRepository.findById(projectId);
-      
+
       if (!project) {
         return res.status(404).json({
           success: false,
@@ -101,7 +101,7 @@ class FileController {
       const path = require('path');
       const fs = require('fs').promises;
       const multer = require('multer');
-      
+
       const projectStorage = multer.diskStorage({
         destination: async (req, file, cb) => {
           const uploadPath = path.join(process.cwd(), 'uploads', 'projects');
@@ -207,7 +207,7 @@ class FileController {
 
         } catch (error) {
           console.error('Error guardando archivos del proyecto:', error);
-          
+
           // Limpiar archivos subidos en caso de error
           for (const file of req.files) {
             try {
@@ -247,7 +247,7 @@ class FileController {
       const TaskRepository = require('../repositories/TaskRepository');
       const taskRepository = new TaskRepository();
       const task = await taskRepository.findById(taskId);
-      
+
       if (!task) {
         return res.status(404).json({
           success: false,
@@ -314,7 +314,7 @@ class FileController {
 
         } catch (error) {
           console.error('Error guardando archivos:', error);
-          
+
           // Limpiar archivos subidos en caso de error
           for (const file of req.files) {
             try {
@@ -352,7 +352,7 @@ class FileController {
       // El middleware ya verificó los permisos
       const FileRepository = require('../repositories/FileRepository');
       const fileRepository = new FileRepository();
-      
+
       const files = await fileRepository.findByTask(taskId);
 
       res.json({
@@ -365,6 +365,130 @@ class FileController {
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  /**
+   * Obtener todos los archivos accesibles para el usuario autenticado
+   * GET /api/files
+   * Permisos: Usuario autenticado (archivos filtrados por permisos)
+   */
+  async getAllFilesForUser(req, res) {
+    try {
+      const userId = req.user.id;
+      const isAdmin = req.user.es_administrador;
+      const { search, tipo, tipo_entidad, entidad_id } = req.query;
+
+      const { pool } = require('../config/db');
+
+      let files = [];
+
+      // Obtener archivos de proyectos
+      const projectWhereConditions = [];
+      const projectParams = [];
+
+      if (tipo) {
+        projectWhereConditions.push('tipo = ?');
+        projectParams.push(tipo);
+      }
+      if (entidad_id && tipo_entidad === 'proyecto') {
+        projectWhereConditions.push('proyecto_id = ?');
+        projectParams.push(entidad_id);
+      }
+      if (!isAdmin) {
+        projectWhereConditions.push('subido_por = ?');
+        projectParams.push(userId);
+      }
+
+      const projectWhere = projectWhereConditions.length > 0
+        ? 'WHERE ' + projectWhereConditions.join(' AND ')
+        : '';
+
+      const [projectFiles] = await pool.execute(`
+        SELECT 
+          id,
+          nombre_archivo,
+          nombre_original,
+          tipo,
+          tamaño_bytes,
+          ruta_archivo,
+          subido_por,
+          proyecto_id,
+          NULL as tarea_id,
+          created_at
+        FROM archivos_proyecto
+        ${projectWhere}
+        ORDER BY created_at DESC
+        LIMIT 100
+      `, projectParams);
+
+      // Obtener archivos de tareas
+      const taskWhereConditions = [];
+      const taskParams = [];
+
+      if (tipo) {
+        taskWhereConditions.push('tipo = ?');
+        taskParams.push(tipo);
+      }
+      if (entidad_id && tipo_entidad === 'tarea') {
+        taskWhereConditions.push('tarea_id = ?');
+        taskParams.push(entidad_id);
+      }
+      if (!isAdmin) {
+        taskWhereConditions.push('subido_por = ?');
+        taskParams.push(userId);
+      }
+
+      const taskWhere = taskWhereConditions.length > 0
+        ? 'WHERE ' + taskWhereConditions.join(' AND ')
+        : '';
+
+      const [taskFiles] = await pool.execute(`
+        SELECT 
+          id,
+          nombre_archivo,
+          nombre_original,
+          tipo,
+          tamaño_bytes,
+          ruta_archivo,
+          subido_por,
+          NULL as proyecto_id,
+          tarea_id,
+          created_at
+        FROM archivos_tarea
+        ${taskWhere}
+        ORDER BY created_at DESC
+        LIMIT 100
+      `, taskParams);
+
+      // Combinar archivos
+      files = [...projectFiles, ...taskFiles];
+
+      // Ordenar por fecha (más recientes primero)
+      files.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      // Filtrar por búsqueda si se proporciona
+      if (search) {
+        const searchLower = search.toLowerCase();
+        files = files.filter(f =>
+          f.nombre_original?.toLowerCase().includes(searchLower) ||
+          f.nombre_archivo?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      res.json({
+        success: true,
+        data: files,
+        files: files // Compatibilidad con ambos formatos
+      });
+
+    } catch (error) {
+      console.error('Error obteniendo archivos:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
       });
     }
   }
