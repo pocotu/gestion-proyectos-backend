@@ -15,20 +15,20 @@ async function start() {
     // Optional: setup database when requested
     if (process.env.SETUP_DB === 'true') {
       logger.info('SETUP_DB=true detected — running database setup');
-      
+
       // Limpiar base de datos si CLEAN_DATABASE=true
       if (process.env.CLEAN_DATABASE === 'true') {
         logger.info('CLEAN_DATABASE=true detected — cleaning database');
         const pool = require('./config/db').pool;
-        
+
         await pool.query('SET FOREIGN_KEY_CHECKS = 0');
-        
+
         const tables = [
           'logs_actividad', 'archivos_proyecto', 'archivos_tarea',
           'tareas', 'proyecto_responsables', 'proyectos',
           'usuario_roles', 'usuarios', 'roles'
         ];
-        
+
         for (const table of tables) {
           try {
             await pool.query(`DELETE FROM ${table}`);
@@ -40,18 +40,26 @@ async function start() {
             }
           }
         }
-        
+
         await pool.query('SET FOREIGN_KEY_CHECKS = 1');
         logger.info('Database cleaned successfully');
       }
-      
-      // Crear tablas y ejecutar seeders
+
+      // Crear tablas
       await createAllTables();
-      
+
+      // Ejecutar migraciones automáticamente para actualizar esquema
+      logger.info('Running database migrations...');
+      const { MigrationManager } = require('../scripts/migrate');
+      const migrationManager = new MigrationManager();
+      await migrationManager.runMigrations();
+      logger.info('Migrations completed successfully');
+
+      // Ejecutar seeders
       const SeederManager = require('./seeders');
       const seederManager = new SeederManager();
       await seederManager.runAll();
-      
+
       logger.info('Database setup complete');
     }
 
