@@ -16,8 +16,32 @@ async function start() {
     if (process.env.SETUP_DB === 'true') {
       logger.info('SETUP_DB=true detected — running database setup');
 
-      // Limpiar base de datos si CLEAN_DATABASE=true
-      if (process.env.CLEAN_DATABASE === 'true') {
+      // OPCIÓN 1: DROP completo de la base de datos (para resetear Railway)
+      if (process.env.DROP_DATABASE === 'true') {
+        logger.warn('DROP_DATABASE=true detected — DROPPING ALL TABLES!');
+        const pool = require('./config/db').pool;
+
+        try {
+          await pool.query('SET FOREIGN_KEY_CHECKS = 0');
+
+          // Obtener todas las tablas
+          const [tables] = await pool.query('SHOW TABLES');
+
+          // Eliminar cada tabla
+          for (const row of tables) {
+            const tableName = Object.values(row)[0];
+            logger.info(`Dropping table: ${tableName}`);
+            await pool.query(`DROP TABLE IF EXISTS ${tableName}`);
+          }
+
+          await pool.query('SET FOREIGN_KEY_CHECKS = 1');
+          logger.warn('All tables dropped successfully - database reset complete');
+        } catch (error) {
+          logger.error('Error dropping tables:', error);
+        }
+      }
+      // OPCIÓN 2: Limpiar datos sin eliminar estructura (mantener para compatibilidad)
+      else if (process.env.CLEAN_DATABASE === 'true') {
         logger.info('CLEAN_DATABASE=true detected — cleaning database');
         const pool = require('./config/db').pool;
 
