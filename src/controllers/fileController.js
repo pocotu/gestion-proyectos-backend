@@ -1,4 +1,5 @@
 const FileService = require('../services/fileService');
+const CloudinaryService = require('../services/cloudinaryService');
 const config = require('../config/config');
 const multer = require('multer');
 const path = require('path');
@@ -16,30 +17,27 @@ const fs = require('fs').promises;
 class FileController {
   constructor() {
     this.fileService = new FileService();
+    this.cloudinaryService = new CloudinaryService();
     this.setupMulter();
   }
 
   /**
+   * Extraer tipo de archivo desde el nombre (SRP - Single Responsibility)
+   * @param {string} filename - Nombre del archivo
+   * @returns {string} - Tipo en mayúsculas (PDF, DOCX, TXT, etc.)
+   */
+  getFileTypeFromFilename(filename) {
+    const extension = path.extname(filename).toLowerCase().replace('.', '');
+    return extension.toUpperCase();
+  }
+
+  /**
    * Configurar multer para upload de archivos
+   * Usando memoryStorage para Cloudinary (archivos en RAM temporalmente)
    */
   setupMulter() {
-    const storage = multer.diskStorage({
-      destination: async (req, file, cb) => {
-        const uploadPath = path.join(process.cwd(), 'uploads', 'tasks');
-        try {
-          await fs.mkdir(uploadPath, { recursive: true });
-          cb(null, uploadPath);
-        } catch (error) {
-          cb(error);
-        }
-      },
-      filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const extension = path.extname(file.originalname);
-        const baseName = path.basename(file.originalname, extension);
-        cb(null, `${baseName}-${uniqueSuffix}${extension}`);
-      }
-    });
+    // Usar memoryStorage en lugar de diskStorage para Cloudinary
+    const storage = multer.memoryStorage();
 
     const fileFilter = (req, file, cb) => {
       // Tipos de archivo permitidos
@@ -102,23 +100,7 @@ class FileController {
       const fs = require('fs').promises;
       const multer = require('multer');
 
-      const projectStorage = multer.diskStorage({
-        destination: async (req, file, cb) => {
-          const uploadPath = path.join(process.cwd(), 'uploads', 'projects');
-          try {
-            await fs.mkdir(uploadPath, { recursive: true });
-            cb(null, uploadPath);
-          } catch (error) {
-            cb(error);
-          }
-        },
-        filename: (req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-          const extension = path.extname(file.originalname);
-          const baseName = path.basename(file.originalname, extension);
-          cb(null, `${baseName}-${uniqueSuffix}${extension}`);
-        }
-      });
+      const projectStorage = multer.memoryStorage();
 
       const fileFilter = (req, file, cb) => {
         const allowedTypes = config.ALLOWED_MIME_TYPES || [
@@ -184,11 +166,23 @@ class FileController {
           const fileRepository = new FileRepository();
 
           for (const file of req.files) {
+            // Extraer tipo inline (sin 'this' porque estamos en callback)
+            const extension = path.extname(file.originalname).toLowerCase().replace('.', '');
+            const tipo = extension.toUpperCase();
+
+            // Subir a Cloudinary
+            const cloudinaryResult = await this.cloudinaryService.uploadFile(file.buffer, {
+              folder: `gestion-proyectos/project-${projectId}`,
+              originalName: file.originalname,
+              resourceType: this.cloudinaryService.getResourceType(file.mimetype)
+            });
+
             const fileData = {
               nombre_original: file.originalname,
-              nombre_archivo: file.filename,
-              ruta_archivo: file.path,
+              nombre_archivo: cloudinaryResult.public_id, // Guardar public_id en nombre_archivo
+              ruta_archivo: cloudinaryResult.url, // URL de Cloudinary
               tipo_mime: file.mimetype,
+              tipo: tipo,
               tamano_bytes: file.size,
               proyecto_id: projectId,
               tarea_id: null,
@@ -208,14 +202,7 @@ class FileController {
         } catch (error) {
           console.error('Error guardando archivos del proyecto:', error);
 
-          // Limpiar archivos subidos en caso de error
-          for (const file of req.files) {
-            try {
-              await fs.unlink(file.path);
-            } catch (unlinkError) {
-              console.error('Error eliminando archivo:', unlinkError);
-            }
-          }
+          // Ya no necesitamos limpiar archivos locales (están en Cloudinary)
 
           res.status(500).json({
             success: false,
@@ -291,11 +278,23 @@ class FileController {
           const fileRepository = new FileRepository();
 
           for (const file of req.files) {
+            // Extraer tipo inline (sin 'this' porque estamos en callback)
+            const extension = path.extname(file.originalname).toLowerCase().replace('.', '');
+            const tipo = extension.toUpperCase();
+
+            // Subir a Cloudinary
+            const cloudinaryResult = await this.cloudinaryService.uploadFile(file.buffer, {
+              folder: `gestion-proyectos/task-${taskId}`,
+              originalName: file.originalname,
+              resourceType: this.cloudinaryService.getResourceType(file.mimetype)
+            });
+
             const fileData = {
               nombre_original: file.originalname,
-              nombre_archivo: file.filename,
-              ruta_archivo: file.path,
+              nombre_archivo: cloudinaryResult.public_id, // Guardar public_id
+              ruta_archivo: cloudinaryResult.url, // URL de Cloudinary
               tipo_mime: file.mimetype,
+              tipo: tipo,
               tamano_bytes: file.size,
               proyecto_id: null,
               tarea_id: taskId,
@@ -504,7 +503,29 @@ class FileController {
       const userId = req.user.id;
       const isAdmin = req.user.es_administrador;
 
-      const file = await this.fileService.getFileById(fileId);
+      // Buscar archivo en ambas tablas (proyecto y tarea)
+      const { pool } = require('../config/db');
+      let file = null;
+
+      // Buscar en archivos_proyecto
+      const [projectFiles] = await pool.execute(
+        'SELECT * FROM archivos_proyecto WHERE id = ?',
+        [fileId]
+      );
+
+      if (projectFiles.length > 0) {
+        file = projectFiles[0];
+      } else {
+        // Buscar en archivos_tarea
+        const [taskFiles] = await pool.execute(
+          'SELECT * FROM archivos_tarea WHERE id = ?',
+          [fileId]
+        );
+
+        if (taskFiles.length > 0) {
+          file = taskFiles[0];
+        }
+      }
 
       if (!file) {
         return res.status(404).json({
@@ -513,18 +534,43 @@ class FileController {
         });
       }
 
-      // Verificar permisos sobre la tarea del archivo
-      if (!isAdmin) {
-        const hasAccess = await this.fileService.userHasAccessToTask(userId, file.tarea_id);
-        if (!hasAccess) {
-          return res.status(403).json({
+      // Verificar permisos
+      if (!isAdmin && file.subido_por !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes acceso a este archivo'
+        });
+      }
+
+      // Si ruta_archivo es URL de Cloudinary, hacer proxy streaming
+      if (file.ruta_archivo && file.ruta_archivo.startsWith('http')) {
+        try {
+          const axios = require('axios');
+
+          // Configurar headers antes de streamear
+          res.setHeader('Content-Disposition', `attachment; filename="${file.nombre_original}"`);
+          res.setHeader('Content-Type', file.tipo_mime || 'application/octet-stream');
+
+          // Streamear desde Cloudinary al cliente
+          const response = await axios({
+            method: 'get',
+            url: file.ruta_archivo,
+            responseType: 'stream'
+          });
+
+          // Pipe el stream al response
+          response.data.pipe(res);
+          return;
+        } catch (cloudError) {
+          console.error('Error streaming from Cloudinary:', cloudError);
+          return res.status(500).json({
             success: false,
-            message: 'No tienes acceso a este archivo'
+            message: 'Error descargando archivo'
           });
         }
       }
 
-      // Verificar que el archivo físico existe
+      // Fallback: archivo local
       try {
         await fs.access(file.ruta_archivo);
       } catch (error) {
@@ -534,12 +580,9 @@ class FileController {
         });
       }
 
-      // Registrar descarga
-      await this.fileService.logFileDownload(fileId, userId);
-
       // Configurar headers para descarga
       res.setHeader('Content-Disposition', `attachment; filename="${file.nombre_original}"`);
-      res.setHeader('Content-Type', file.tipo_mime);
+      res.setHeader('Content-Type', file.tipo_mime || 'application/octet-stream');
 
       // Enviar archivo
       res.sendFile(path.resolve(file.ruta_archivo));
