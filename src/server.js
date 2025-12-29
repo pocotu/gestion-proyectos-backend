@@ -45,15 +45,22 @@ async function start() {
         logger.info('Database cleaned successfully');
       }
 
-      // Crear tablas
-      await createAllTables();
+      // Ejecutar migraciones PRIMERO para crear/actualizar esquema desde archivos SQL
+      // Las migraciones son opcionales - si fallan, continuamos con createAllTables
+      try {
+        logger.info('Running database migrations...');
+        const { MigrationManager } = require('../scripts/migrate');
+        const migrationManager = new MigrationManager();
+        await migrationManager.runMigrations();
+        logger.info('Migrations completed successfully');
+      } catch (migrationError) {
+        logger.warn('Migrations failed, continuing with table creation:', migrationError.message);
+        // Continuar con el setup normal aunque fallen las migraciones
+      }
 
-      // Ejecutar migraciones automáticamente para actualizar esquema
-      logger.info('Running database migrations...');
-      const { MigrationManager } = require('../scripts/migrate');
-      const migrationManager = new MigrationManager();
-      await migrationManager.runMigrations();
-      logger.info('Migrations completed successfully');
+      // Crear tablas adicionales si las migraciones no las cubrieron todas
+      // (Fallback para compatibilidad con sistema antiguo)
+      await createAllTables();
 
       // Ejecutar seeders
       const SeederManager = require('./seeders');
