@@ -9,7 +9,7 @@ class FileModel {
         proyecto_id INT NOT NULL,
         nombre_archivo VARCHAR(200) NOT NULL,
         nombre_original VARCHAR(200) NOT NULL,
-        tipo ENUM('PDF', 'DOCX', 'JPG') NOT NULL,
+        tipo VARCHAR(10) DEFAULT NULL,
         tamaño_bytes INT,
         ruta_archivo VARCHAR(500) NOT NULL,
         subido_por INT NOT NULL,
@@ -18,7 +18,7 @@ class FileModel {
         FOREIGN KEY (subido_por) REFERENCES usuarios(id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `;
-    
+
     // Crear tabla archivos_tarea
     const sqlTarea = `
       CREATE TABLE IF NOT EXISTS archivos_tarea (
@@ -26,7 +26,7 @@ class FileModel {
         tarea_id INT NOT NULL,
         nombre_archivo VARCHAR(200) NOT NULL,
         nombre_original VARCHAR(200) NOT NULL,
-        tipo ENUM('PDF', 'DOCX', 'JPG') NOT NULL,
+        tipo VARCHAR(10) DEFAULT NULL,
         tamaño_bytes INT,
         ruta_archivo VARCHAR(500) NOT NULL,
         subido_por INT NOT NULL,
@@ -35,7 +35,7 @@ class FileModel {
         FOREIGN KEY (subido_por) REFERENCES usuarios(id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `;
-    
+
     await pool.query(sqlProyecto);
     await pool.query(sqlTarea);
   }
