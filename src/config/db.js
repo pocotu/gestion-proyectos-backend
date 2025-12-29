@@ -13,6 +13,7 @@ const pool = mysql.createPool({
   queueLimit: config.DB_QUEUE_LIMIT,
   // Configuraciones válidas para mysql2
   waitForConnections: true,
+  timezone: 'Z',            // IMPORTANTE: Usar UTC para todas las fechas
   idleTimeout: 300000,    // 5 minutos de timeout para conexiones idle
   enableKeepAlive: true,  // Mantener conexiones vivas
   keepAliveInitialDelay: 0

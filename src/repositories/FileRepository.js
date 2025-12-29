@@ -59,16 +59,51 @@ class FileRepository extends BaseRepository {
     const columns = Object.keys(insertData).filter(k => insertData[k] !== undefined && insertData[k] !== null);
     const placeholders = columns.map(() => '?').join(', ');
     const values = columns.map(k => insertData[k]);
-    
+
     const sql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
     // Para INSERT necesitamos usar el pool directamente para obtener insertId
     const { pool } = require('../config/db');
     const [result] = await pool.execute(sql, values);
-    
+
     return {
       id: result.insertId,
       ...insertData
     };
+  }
+
+  /**
+   * Busca un archivo por ID (en ambas tablas)
+   * Principio SOLID: Single Responsibility - un solo método para buscar por ID
+   */
+  async findById(id) {
+    try {
+      const { pool } = require('../config/db');
+
+      // Buscar primero en archivos_proyecto
+      const [projectFiles] = await pool.execute(
+        'SELECT * FROM archivos_proyecto WHERE id = ?',
+        [id]
+      );
+
+      if (projectFiles.length > 0) {
+        return projectFiles[0];
+      }
+
+      // Si no está en proyectos, buscar en archivos_tarea
+      const [taskFiles] = await pool.execute(
+        'SELECT * FROM archivos_tarea WHERE id = ?',
+        [id]
+      );
+
+      if (taskFiles.length > 0) {
+        return taskFiles[0];
+      }
+
+      return null; // Archivo no encontrado
+    } catch (error) {
+      console.error('Error en FileRepository.findById:', error);
+      throw error;
+    }
   }
 
   /**
@@ -113,7 +148,7 @@ class FileRepository extends BaseRepository {
    */
   async findByTask(tarea_id, options = {}) {
     const { limit, offset, userId, isAdmin } = options;
-    
+
     let query = this
       .select(`
         ${this.tableName}.*,
@@ -123,15 +158,15 @@ class FileRepository extends BaseRepository {
       .leftJoin('usuarios', `${this.tableName}.subido_por`, 'usuarios.id')
       .where(`${this.tableName}.tarea_id`, tarea_id)
       .orderBy(`${this.tableName}.created_at`, 'DESC');
-    
+
     if (limit) {
       query = query.limit(limit);
     }
-    
+
     if (offset) {
       query = query.offset(offset);
     }
-    
+
     return await query.get();
   }
 
@@ -191,9 +226,9 @@ class FileRepository extends BaseRepository {
       .leftJoin('proyectos', 'archivos.proyecto_id', 'proyectos.id')
       .leftJoin('tareas', 'archivos.tarea_id', 'tareas.id')
       .leftJoin('usuarios', 'archivos.subido_por', 'usuarios.id')
-      .where(function() {
+      .where(function () {
         this.where('archivos.nombre_archivo', 'LIKE', `%${searchTerm}%`)
-            .orWhere('archivos.nombre_original', 'LIKE', `%${searchTerm}%`);
+          .orWhere('archivos.nombre_original', 'LIKE', `%${searchTerm}%`);
       });
 
     if (proyecto_id) {
@@ -267,7 +302,7 @@ class FileRepository extends BaseRepository {
    */
   async getProjectFileStats(proyecto_id) {
     const totalFiles = await this.where('proyecto_id', proyecto_id).count();
-    
+
     const byType = await this.raw(`
       SELECT tipo, COUNT(*) as count, SUM(tamano_bytes) as total_size
       FROM archivos
@@ -318,7 +353,7 @@ class FileRepository extends BaseRepository {
    */
   async getUserFileStats(usuario_id) {
     const totalFiles = await this.where('subido_por', usuario_id).count();
-    
+
     const byType = await this.raw(`
       SELECT tipo, COUNT(*) as count, SUM(tamano_bytes) as total_size
       FROM archivos
@@ -392,13 +427,13 @@ class FileRepository extends BaseRepository {
       SELECT nombre_original, COUNT(*) as count, GROUP_CONCAT(id) as file_ids
       FROM archivos
     `;
-    
+
     let params = [];
     if (proyecto_id) {
       baseQuery += ' WHERE proyecto_id = ?';
       params.push(proyecto_id);
     }
-    
+
     baseQuery += `
       GROUP BY nombre_original
       HAVING count > 1
@@ -441,7 +476,7 @@ class FileRepository extends BaseRepository {
   async updateFileInfo(id, updateData) {
     const allowedFields = ['nombre_original', 'tipo', 'tamano_bytes'];
     const filteredData = {};
-    
+
     Object.keys(updateData).forEach(key => {
       if (allowedFields.includes(key)) {
         filteredData[key] = updateData[key];
@@ -508,7 +543,7 @@ class FileRepository extends BaseRepository {
   async findByExtension(extension, proyecto_id = null) {
     // Normalizar la extensión
     const normalizedExt = extension.startsWith('.') ? extension : `.${extension}`;
-    
+
     let query = this
       .select(`
         archivos.*,
@@ -535,7 +570,7 @@ class FileRepository extends BaseRepository {
    */
   async getGeneralStatistics() {
     const totalFiles = await this.count();
-    
+
     const sizeStats = await this.raw(`
       SELECT 
         COUNT(*) as files_with_size,
@@ -631,7 +666,7 @@ class FileRepository extends BaseRepository {
     const result = await this
       .where(`${this.tableName}.tarea_id`, tarea_id)
       .count();
-    
+
     return result;
   }
 }

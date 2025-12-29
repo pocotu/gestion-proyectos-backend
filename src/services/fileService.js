@@ -28,7 +28,7 @@ class FileService {
   async getAllFiles({ page = 1, limit = 10, filters = {}, userId = null, isAdmin = false }) {
     try {
       const offset = (page - 1) * limit;
-      
+
       const files = await this.fileRepository.findAll({
         limit,
         offset,
@@ -60,7 +60,7 @@ class FileService {
   async getFileById(id, userId = null, isAdmin = false) {
     try {
       const file = await this.fileRepository.findById(id);
-      
+
       if (!file) {
         throw new Error('Archivo no encontrado');
       }
@@ -166,21 +166,14 @@ class FileService {
 
   /**
    * Eliminar archivo
+   * Nota: La verificación de permisos se hace en el Controller
    */
-  async deleteFile(id, userId, isAdmin = false) {
+  async deleteFile(id) {
     try {
+      // Buscar archivo en ambas tablas
       const file = await this.fileRepository.findById(id);
       if (!file) {
         throw new Error('Archivo no encontrado');
-      }
-
-      // Verificar permisos
-      if (!isAdmin && file.subido_por !== userId) {
-        // Verificar si tiene acceso al proyecto/tarea asociada
-        const hasAccess = await this.fileRepository.hasUserAccess(id, userId);
-        if (!hasAccess) {
-          throw new Error('No tienes permisos para eliminar este archivo');
-        }
       }
 
       // Eliminar archivo físico
@@ -189,10 +182,21 @@ class FileService {
         await fs.unlink(file.ruta_archivo);
       }
 
-      // Eliminar registro de la base de datos
-      await this.fileRepository.delete(id);
+      // Eliminar de la base de datos
+      // Determinar de qué tabla eliminar basándonos en proyecto_id vs tarea_id
+      const { pool } = require('../config/db');
 
-      return { message: 'Archivo eliminado correctamente' };
+      if (file.proyecto_id) {
+        // Eliminar de archivos_proyecto
+        await pool.execute('DELETE FROM archivos_proyecto WHERE id = ?', [id]);
+      } else if (file.tarea_id) {
+        // Eliminar de archivos_tarea
+        await pool.execute('DELETE FROM archivos_tarea WHERE id = ?', [id]);
+      } else {
+        throw new Error('Archivo no tiene proyecto ni tarea asociada');
+      }
+
+      return true;
     } catch (error) {
       console.error('Error en FileService.deleteFile:', error);
       throw error;
@@ -231,7 +235,7 @@ class FileService {
   async getFilesByProject(projectId, { page = 1, limit = 10, userId = null, isAdmin = false }) {
     try {
       const offset = (page - 1) * limit;
-      
+
       const files = await this.fileRepository.findByProject(projectId, {
         limit,
         offset,
@@ -262,7 +266,7 @@ class FileService {
   async getFilesByTask(taskId, { page = 1, limit = 10, userId = null, isAdmin = false }) {
     try {
       const offset = (page - 1) * limit;
-      
+
       const files = await this.fileRepository.findByTask(taskId, {
         limit,
         offset,
@@ -293,7 +297,7 @@ class FileService {
   async getFilesByUser(userId, { page = 1, limit = 10, filters = {} }) {
     try {
       const offset = (page - 1) * limit;
-      
+
       const files = await this.fileRepository.findByUser(userId, {
         limit,
         offset,
@@ -323,7 +327,7 @@ class FileService {
   async searchFiles(query, { page = 1, limit = 10, userId = null, isAdmin = false }) {
     try {
       const offset = (page - 1) * limit;
-      
+
       const files = await this.fileRepository.search(query, {
         limit,
         offset,
@@ -380,7 +384,7 @@ class FileService {
   async getFilesByType(mimeType, { page = 1, limit = 10, userId = null, isAdmin = false }) {
     try {
       const offset = (page - 1) * limit;
-      
+
       const files = await this.fileRepository.findByMimeType(mimeType, {
         limit,
         offset,
@@ -412,9 +416,9 @@ class FileService {
     try {
       const uploadFiles = await fs.readdir(this.uploadPath);
       const dbFiles = await this.fileRepository.getAllFileNames();
-      
+
       const orphanFiles = uploadFiles.filter(file => !dbFiles.includes(file));
-      
+
       for (const orphanFile of orphanFiles) {
         const filePath = path.join(this.uploadPath, orphanFile);
         await fs.unlink(filePath);
@@ -438,7 +442,7 @@ class FileService {
     const randomString = crypto.randomBytes(8).toString('hex');
     const extension = path.extname(originalName);
     const baseName = path.basename(originalName, extension);
-    
+
     return `${baseName}_${timestamp}_${randomString}${extension}`;
   }
 
@@ -485,10 +489,10 @@ class FileService {
   async getFileInfo(id, userId = null, isAdmin = false) {
     try {
       const file = await this.getFileById(id, userId, isAdmin);
-      
+
       // Verificar que el archivo físico existe
       const fileExists = await this.fileExists(file.ruta_archivo);
-      
+
       return {
         ...file,
         existe_fisicamente: fileExists

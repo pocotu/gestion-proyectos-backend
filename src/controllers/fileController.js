@@ -633,12 +633,19 @@ class FileController {
         }
       }
 
-      // Eliminar archivo físico
-      try {
-        await fs.unlink(file.ruta_archivo);
-      } catch (error) {
-        console.error('Error eliminando archivo físico:', error);
-        // Continuar con la eliminación de la base de datos
+      // Eliminar archivo de Cloudinary (si tiene public_id)
+      // nombre_archivo contiene el public_id de Cloudinary
+      if (file.nombre_archivo && file.ruta_archivo && file.ruta_archivo.startsWith('http')) {
+        try {
+          // Determinar resource_type basado en el tipo MIME del archivo
+          const resourceType = this.cloudinaryService.getResourceType(file.tipo_mime || 'application/octet-stream');
+          await this.cloudinaryService.deleteFile(file.nombre_archivo, resourceType);
+          console.log(`Archivo eliminado de Cloudinary: ${file.nombre_archivo} (${resourceType})`);
+        } catch (cloudError) {
+          console.error('Error eliminando archivo de Cloudinary:', cloudError);
+          // Continuar con eliminación de BD aunque falle Cloudinary
+          // (el archivo quedará huérfano en Cloudinary pero usuario no bloqueado)
+        }
       }
 
       // Eliminar registro de la base de datos
