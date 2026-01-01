@@ -191,7 +191,87 @@ class ProjectSeeder extends BaseSeeder {
       console.log(`   - ${d.estado}: ${d.count} projects`);
     });
 
+    // Obtener TODOS los proyectos existentes para generar logs
+    const allProjects = await this.execute(`
+      SELECT id, titulo, fecha_inicio, estado 
+      FROM proyectos
+    `);
+    
+    console.log(`📝 Generating activity logs for ${allProjects.length} projects...`);
+    await this.generateActivityLogs(allProjects, adminId);
+
     return createdProjects;
+  }
+
+  /**
+   * Genera logs de actividad para los proyectos
+   */
+  async generateActivityLogs(projects, adminId) {
+    const actions = [
+      { accion: 'crear', descripcion: 'Proyecto creado' },
+      { accion: 'actualizar', descripcion: 'Información del proyecto actualizada' },
+      { accion: 'actualizar', descripcion: 'Fechas del proyecto modificadas' },
+      { accion: 'actualizar', descripcion: 'Estado del proyecto cambiado' },
+      { accion: 'actualizar', descripcion: 'Descripción del proyecto actualizada' },
+      { accion: 'ver', descripcion: 'Proyecto visualizado' },
+      { accion: 'ver', descripcion: 'Detalles del proyecto consultados' },
+      { accion: 'asignacion', descripcion: 'Responsable asignado al proyecto' },
+      { accion: 'asignacion', descripcion: 'Nuevo miembro agregado al equipo' },
+      { accion: 'cambio_estado', descripcion: 'Estado del proyecto actualizado a En Progreso' },
+      { accion: 'cambio_estado', descripcion: 'Estado del proyecto actualizado a Completado' },
+      { accion: 'subir_archivo', descripcion: 'Documento adjuntado al proyecto' },
+      { accion: 'subir_archivo', descripcion: 'Archivo de especificaciones subido' },
+      { accion: 'descargar_archivo', descripcion: 'Documento del proyecto descargado' },
+      { accion: 'actualizar', descripcion: 'Presupuesto del proyecto ajustado' },
+      { accion: 'actualizar', descripcion: 'Prioridad del proyecto modificada' },
+      { accion: 'ver', descripcion: 'Reporte de avance consultado' },
+      { accion: 'ver', descripcion: 'Dashboard del proyecto visualizado' },
+      { accion: 'actualizar', descripcion: 'Hitos del proyecto actualizados' },
+      { accion: 'actualizar', descripcion: 'Recursos del proyecto reasignados' }
+    ];
+
+    let totalLogs = 0;
+
+    for (const project of projects) {
+      // Generar entre 25-35 logs por proyecto
+      const numLogs = Math.floor(Math.random() * 11) + 25;
+      
+      for (let i = 0; i < numLogs; i++) {
+        const action = actions[Math.floor(Math.random() * actions.length)];
+        
+        // Generar fecha aleatoria entre la fecha de inicio del proyecto y ahora
+        const startDate = new Date(project.fecha_inicio);
+        const now = new Date();
+        const randomDate = new Date(startDate.getTime() + Math.random() * (now.getTime() - startDate.getTime()));
+        
+        const logData = {
+          usuario_id: adminId,
+          accion: action.accion,
+          entidad_tipo: 'proyecto',
+          entidad_id: project.id,
+          descripcion: `${action.descripcion} - ${project.titulo}`,
+          created_at: randomDate.toISOString().slice(0, 19).replace('T', ' ')
+        };
+
+        await this.execute(`
+          INSERT INTO logs_actividad 
+          (usuario_id, accion, entidad_tipo, entidad_id, descripcion, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [
+          logData.usuario_id,
+          logData.accion,
+          logData.entidad_tipo,
+          logData.entidad_id,
+          logData.descripcion,
+          logData.created_at
+        ]);
+        
+        totalLogs++;
+      }
+    }
+
+    console.log(`✅ Generated ${totalLogs} activity logs for ${projects.length} projects`);
+    console.log(`   Average: ${Math.round(totalLogs / projects.length)} logs per project`);
   }
 
   /**
