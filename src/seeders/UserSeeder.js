@@ -23,7 +23,7 @@ class UserSeeder extends BaseSeeder {
     const adminUser = {
       nombre: 'Administrador del Sistema',
       email: 'admin@gestion-proyectos.com',
-      contraseña: await this.hashPassword('Admin123!'),
+      contraseña: await this.hashPassword('Proyecto123!'), // Hash único
       telefono: '+1234567890',
       estado: 1,
       es_administrador: 1
@@ -43,9 +43,86 @@ class UserSeeder extends BaseSeeder {
       }
     }
 
+    // Obtener rol de gestor de proyectos
+    const managerRoleId = await this.getId('roles', { nombre: 'gestor_proyectos' });
+
+    // Crear 5 usuarios gestores de proyectos
+    // Cada uno con su propio hash único (aunque la contraseña sea la misma)
+    const projectManagers = [
+      {
+        nombre: 'Carlos Rodríguez',
+        email: 'carlos.rodriguez@gestion-proyectos.com',
+        contraseña: await this.hashPassword('Proyecto123!'), // Hash único
+        telefono: '+1234567891',
+        estado: 1,
+        es_administrador: 0
+      },
+      {
+        nombre: 'María González',
+        email: 'maria.gonzalez@gestion-proyectos.com',
+        contraseña: await this.hashPassword('Proyecto123!'), // Hash único
+        telefono: '+1234567892',
+        estado: 1,
+        es_administrador: 0
+      },
+      {
+        nombre: 'Juan Martínez',
+        email: 'juan.martinez@gestion-proyectos.com',
+        contraseña: await this.hashPassword('Proyecto123!'), // Hash único
+        telefono: '+1234567893',
+        estado: 1,
+        es_administrador: 0
+      },
+      {
+        nombre: 'Ana López',
+        email: 'ana.lopez@gestion-proyectos.com',
+        contraseña: await this.hashPassword('Proyecto123!'), // Hash único
+        telefono: '+1234567894',
+        estado: 1,
+        es_administrador: 0
+      },
+      {
+        nombre: 'Pedro Sánchez',
+        email: 'pedro.sanchez@gestion-proyectos.com',
+        contraseña: await this.hashPassword('Proyecto123!'), // Hash único
+        telefono: '+1234567895',
+        estado: 1,
+        es_administrador: 0
+      }
+    ];
+
+    // Crear cada gestor de proyectos
+    for (const manager of projectManagers) {
+      const managerId = await this.insertIfNotExists('usuarios', manager, ['email']);
+      
+      // Asignar rol de gestor de proyectos
+      if (managerId && managerRoleId) {
+        await this.insertIfNotExists('usuario_roles', {
+          usuario_id: managerId,
+          rol_id: managerRoleId
+        }, ['usuario_id', 'rol_id']);
+      }
+    }
+
     // Verificar que los usuarios fueron creados
     const totalUsers = await this.execute('SELECT COUNT(*) as count FROM usuarios');
     console.log(`✅ Users seeded successfully. Total users: ${totalUsers[0].count}`);
+    
+    // Mostrar credenciales
+    console.log('\n📋 CREDENCIALES DE USUARIOS:');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('👤 ADMINISTRADOR:');
+    console.log('   Email: admin@gestion-proyectos.com');
+    console.log('   Contraseña: Proyecto123!');
+    console.log('\n👥 GESTORES DE PROYECTOS:');
+    console.log('   1. Carlos Rodríguez - carlos.rodriguez@gestion-proyectos.com');
+    console.log('   2. María González - maria.gonzalez@gestion-proyectos.com');
+    console.log('   3. Juan Martínez - juan.martinez@gestion-proyectos.com');
+    console.log('   4. Ana López - ana.lopez@gestion-proyectos.com');
+    console.log('   5. Pedro Sánchez - pedro.sanchez@gestion-proyectos.com');
+    console.log('   Contraseña (todos): Proyecto123!');
+    console.log('   ⚠️  Nota: Cada usuario tiene un hash único por seguridad');
+    console.log('═══════════════════════════════════════════════════════════\n');
   }
 
   /**
