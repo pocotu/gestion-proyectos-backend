@@ -19,7 +19,7 @@ class TaskSeeder extends BaseSeeder {
    */
   async seed() {
     // Obtener proyectos existentes
-    const projects = await this.execute('SELECT id, titulo FROM proyectos ORDER BY id');
+    const projects = await this.execute('SELECT id, titulo, fecha_inicio FROM proyectos ORDER BY id');
     
     if (projects.length === 0) {
       console.log('⚠️ No projects found for task assignment');
@@ -42,10 +42,13 @@ class TaskSeeder extends BaseSeeder {
     const admin = adminUser[0];
 
     const createdTasks = [];
+    let totalTasksCreated = 0;
 
-    // Crear tareas para cada proyecto
+    // Crear exactamente 20 tareas para cada proyecto
     for (const project of projects) {
       const tasksForProject = this.generateTasksForProject(project);
+      
+      console.log(`📝 Creating 20 tasks for project: ${project.titulo}`);
       
       for (const taskData of tasksForProject) {
         const taskId = await this.insertIfNotExists('tareas', {
@@ -57,210 +60,130 @@ class TaskSeeder extends BaseSeeder {
 
         if (taskId) {
           createdTasks.push({ id: taskId, ...taskData, proyecto_id: project.id });
+          totalTasksCreated++;
         }
       }
     }
 
-    // Crear algunas tareas adicionales específicas
-    await this.createSpecificTasks(projects, admin);
-
     // Verificar que las tareas fueron creadas
     const totalTasks = await this.execute('SELECT COUNT(*) as count FROM tareas');
     console.log(`✅ Tasks seeded successfully. Total tasks: ${totalTasks[0].count}`);
+    console.log(`📊 Tasks created in this run: ${totalTasksCreated}`);
+    console.log(`📊 Projects with tasks: ${projects.length}`);
+    console.log(`📊 Average tasks per project: ${(totalTasks[0].count / projects.length).toFixed(1)}`);
+
+    // Mostrar distribución por estado
+    const distribution = await this.execute(`
+      SELECT estado, COUNT(*) as count 
+      FROM tareas 
+      GROUP BY estado 
+      ORDER BY count DESC
+    `);
+    console.log('📊 Task distribution by status:');
+    distribution.forEach(d => {
+      console.log(`   - ${d.estado}: ${d.count} tasks`);
+    });
 
     return createdTasks;
   }
 
   /**
-   * Genera tareas específicas para un proyecto
+   * Genera exactamente 20 tareas para un proyecto
    */
   generateTasksForProject(project) {
-    const taskTemplates = {
-      'Sistema de Gestión de Inventario': [
-        {
-          titulo: 'Diseño de base de datos para inventario',
-          descripcion: 'Crear el esquema de base de datos para gestión de productos, categorías y stock.',
-          estado: 'completada',
-          prioridad: 'alta',
-          fecha_inicio: '2024-01-15',
-          fecha_fin: '2024-01-25'
-        },
-        {
-          titulo: 'Implementación de API REST para productos',
-          descripcion: 'Desarrollar endpoints para CRUD de productos con validaciones.',
-          estado: 'en_progreso',
-          prioridad: 'alta',
-          fecha_inicio: '2024-01-26',
-          fecha_fin: '2024-02-15'
-        },
-        {
-          titulo: 'Sistema de alertas de stock bajo',
-          descripcion: 'Implementar notificaciones automáticas cuando el stock esté por debajo del mínimo.',
-          estado: 'pendiente',
-          prioridad: 'media',
-          fecha_inicio: '2024-02-16',
-          fecha_fin: '2024-03-01'
-        }
-      ],
-      'Aplicación Móvil de Delivery': [
-        {
-          titulo: 'Prototipo de interfaz de usuario',
-          descripcion: 'Crear wireframes y mockups para la aplicación móvil.',
-          estado: 'completada',
-          prioridad: 'alta',
-          fecha_inicio: '2024-02-01',
-          fecha_fin: '2024-02-10'
-        },
-        {
-          titulo: 'Integración con servicios de geolocalización',
-          descripcion: 'Implementar funcionalidad de GPS y mapas para seguimiento de pedidos.',
-          estado: 'en_progreso',
-          prioridad: 'alta',
-          fecha_inicio: '2024-02-11',
-          fecha_fin: '2024-03-15'
-        },
-        {
-          titulo: 'Sistema de pagos en línea',
-          descripcion: 'Integrar pasarelas de pago seguras para la aplicación.',
-          estado: 'pendiente',
-          prioridad: 'alta',
-          fecha_inicio: '2024-03-16',
-          fecha_fin: '2024-04-30'
-        }
-      ],
-      'Portal Web Corporativo': [
-        {
-          titulo: 'Análisis de requerimientos',
-          descripcion: 'Documentar todos los requerimientos funcionales y no funcionales.',
-          estado: 'completada',
-          prioridad: 'alta',
-          fecha_inicio: '2024-03-01',
-          fecha_fin: '2024-03-08'
-        },
-        {
-          titulo: 'Desarrollo del CMS',
-          descripcion: 'Crear sistema de gestión de contenidos para el portal.',
-          estado: 'en_progreso',
-          prioridad: 'alta',
-          fecha_inicio: '2024-03-09',
-          fecha_fin: '2024-04-15'
-        },
-        {
-          titulo: 'Optimización SEO',
-          descripcion: 'Implementar mejores prácticas de SEO en todo el portal.',
-          estado: 'pendiente',
-          prioridad: 'media',
-          fecha_inicio: '2024-04-16',
-          fecha_fin: '2024-05-01'
-        }
-      ]
-    };
+    const tasks = [];
+    const estados = ['completada', 'en_progreso', 'pendiente', 'cancelada'];
+    const prioridades = ['baja', 'media', 'alta'];
+    
+    // Plantillas de tareas genéricas
+    const taskTemplates = [
+      { titulo: 'Análisis de requerimientos', descripcion: 'Documentar requerimientos funcionales y no funcionales del proyecto.' },
+      { titulo: 'Diseño de arquitectura', descripcion: 'Definir la arquitectura técnica y componentes del sistema.' },
+      { titulo: 'Diseño de base de datos', descripcion: 'Crear el modelo de datos y esquema de base de datos.' },
+      { titulo: 'Configuración de entorno de desarrollo', descripcion: 'Preparar el entorno de desarrollo con todas las herramientas necesarias.' },
+      { titulo: 'Implementación de autenticación', descripcion: 'Desarrollar sistema de autenticación y autorización de usuarios.' },
+      { titulo: 'Desarrollo de API REST', descripcion: 'Crear endpoints de API para las funcionalidades principales.' },
+      { titulo: 'Diseño de interfaz de usuario', descripcion: 'Crear mockups y prototipos de la interfaz de usuario.' },
+      { titulo: 'Implementación de frontend', descripcion: 'Desarrollar componentes y vistas del frontend.' },
+      { titulo: 'Integración frontend-backend', descripcion: 'Conectar el frontend con los servicios del backend.' },
+      { titulo: 'Implementación de validaciones', descripcion: 'Agregar validaciones de datos en frontend y backend.' },
+      { titulo: 'Desarrollo de reportes', descripcion: 'Crear módulo de reportes y exportación de datos.' },
+      { titulo: 'Optimización de consultas', descripcion: 'Optimizar consultas de base de datos para mejor rendimiento.' },
+      { titulo: 'Implementación de caché', descripcion: 'Agregar sistema de caché para mejorar tiempos de respuesta.' },
+      { titulo: 'Testing unitario', descripcion: 'Escribir y ejecutar pruebas unitarias para componentes críticos.' },
+      { titulo: 'Testing de integración', descripcion: 'Realizar pruebas de integración entre módulos del sistema.' },
+      { titulo: 'Testing de seguridad', descripcion: 'Ejecutar pruebas de seguridad y vulnerabilidades.' },
+      { titulo: 'Documentación técnica', descripcion: 'Crear documentación técnica completa del proyecto.' },
+      { titulo: 'Documentación de usuario', descripcion: 'Elaborar manuales de usuario y guías de uso.' },
+      { titulo: 'Despliegue en ambiente de pruebas', descripcion: 'Configurar y desplegar el sistema en ambiente de QA.' },
+      { titulo: 'Capacitación de usuarios', descripcion: 'Realizar sesiones de capacitación para usuarios finales.' }
+    ];
 
-    // Si el proyecto tiene tareas específicas, usarlas; sino, generar tareas genéricas
-    if (taskTemplates[project.titulo]) {
-      return taskTemplates[project.titulo];
+    // Generar 20 tareas con distribución realista de estados
+    // 40% completadas, 30% en progreso, 25% pendientes, 5% canceladas
+    const estadoDistribution = [
+      ...Array(8).fill('completada'),
+      ...Array(6).fill('en_progreso'),
+      ...Array(5).fill('pendiente'),
+      ...Array(1).fill('cancelada')
+    ];
+
+    // Mezclar la distribución de estados
+    this.shuffleArray(estadoDistribution);
+
+    for (let i = 0; i < 20; i++) {
+      const template = taskTemplates[i];
+      const estado = estadoDistribution[i];
+      
+      // Asignar prioridad basada en el tipo de tarea
+      let prioridad = 'media';
+      if (i < 5) prioridad = 'alta'; // Primeras 5 tareas son de alta prioridad
+      else if (i > 15) prioridad = 'baja'; // Últimas 4 tareas son de baja prioridad
+      
+      // Calcular fechas basadas en el estado
+      let fecha_inicio, fecha_fin;
+      const baseDate = new Date(project.fecha_inicio || '2024-01-01');
+      
+      if (estado === 'completada') {
+        // Tareas completadas: fechas en el pasado
+        fecha_inicio = this.getDatePlusDays(baseDate.toISOString().split('T')[0], i * 3);
+        fecha_fin = this.getDatePlusDays(fecha_inicio, 5 + Math.floor(Math.random() * 10));
+      } else if (estado === 'en_progreso') {
+        // Tareas en progreso: iniciadas pero no terminadas
+        fecha_inicio = this.getDatePlusDays(baseDate.toISOString().split('T')[0], i * 3);
+        fecha_fin = this.getDatePlusDays(this.getCurrentDate(), 5 + Math.floor(Math.random() * 15));
+      } else if (estado === 'cancelada') {
+        // Tareas canceladas: fechas en el pasado
+        fecha_inicio = this.getDatePlusDays(baseDate.toISOString().split('T')[0], i * 3);
+        fecha_fin = this.getDatePlusDays(fecha_inicio, 3);
+      } else {
+        // Tareas pendientes: fechas futuras
+        fecha_inicio = this.getDatePlusDays(this.getCurrentDate(), 1 + Math.floor(Math.random() * 5));
+        fecha_fin = this.getDatePlusDays(fecha_inicio, 7 + Math.floor(Math.random() * 14));
+      }
+
+      tasks.push({
+        titulo: `${template.titulo} - ${project.titulo.substring(0, 30)}`,
+        descripcion: template.descripcion,
+        estado: estado,
+        prioridad: prioridad,
+        fecha_inicio: fecha_inicio,
+        fecha_fin: fecha_fin
+      });
     }
 
-    // Tareas genéricas para proyectos sin plantilla específica
-    return [
-      {
-        titulo: `Análisis de requerimientos - ${project.titulo}`,
-        descripcion: `Documentar requerimientos funcionales y técnicos para ${project.titulo}.`,
-        estado: 'completada',
-        prioridad: 'alta',
-        fecha_inicio: this.getRandomDate('2024-01-01', '2024-02-01'),
-        fecha_fin: this.getRandomDate('2024-02-02', '2024-03-01')
-      },
-      {
-        titulo: `Desarrollo de funcionalidades core - ${project.titulo}`,
-        descripcion: `Implementar las funcionalidades principales del proyecto ${project.titulo}.`,
-        estado: 'en_progreso',
-        prioridad: 'alta',
-        fecha_inicio: this.getRandomDate('2024-02-01', '2024-03-01'),
-        fecha_fin: this.getRandomDate('2024-04-01', '2024-06-01')
-      },
-      {
-        titulo: `Testing y QA - ${project.titulo}`,
-        descripcion: `Realizar pruebas exhaustivas y control de calidad para ${project.titulo}.`,
-        estado: 'pendiente',
-        prioridad: 'media',
-        fecha_inicio: this.getRandomDate('2024-05-01', '2024-06-01'),
-        fecha_fin: this.getRandomDate('2024-06-15', '2024-07-31')
-      }
-    ];
+    return tasks;
   }
 
   /**
-   * Crea tareas específicas adicionales
+   * Mezcla un array aleatoriamente (Fisher-Yates shuffle)
    */
-  async createSpecificTasks(projects, admin) {
-    // Verificar que tenemos proyectos y admin válidos
-    if (!projects || projects.length === 0 || !admin) {
-      console.log('⚠️ No hay proyectos o admin disponible para crear tareas específicas');
-      return;
+  shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
     }
-
-    const specificTasks = [
-      {
-        titulo: 'Revisión de código general',
-        descripcion: 'Realizar revisión de código para mantener estándares de calidad.',
-        estado: 'pendiente',
-        prioridad: 'alta',
-        fecha_inicio: this.getCurrentDate(),
-        fecha_fin: this.getDatePlusDays(this.getCurrentDate(), 3),
-        proyecto_id: this.randomChoice(projects).id,
-        usuario_asignado_id: admin.id,
-        creado_por: admin.id
-      },
-      {
-        titulo: 'Optimización de base de datos',
-        descripcion: 'Optimizar consultas y estructura de base de datos.',
-        estado: 'completada',
-        prioridad: 'media',
-        fecha_inicio: this.getDateMinusDays(this.getCurrentDate(), 15),
-        fecha_fin: this.getDateMinusDays(this.getCurrentDate(), 5),
-        proyecto_id: this.randomChoice(projects).id,
-        usuario_asignado_id: admin.id,
-        creado_por: admin.id
-      },
-      {
-        titulo: 'Testing de integración',
-        descripcion: 'Ejecutar tests de integración para validar funcionalidades.',
-        estado: 'en_progreso',
-        prioridad: 'alta',
-        fecha_inicio: this.getDateMinusDays(this.getCurrentDate(), 5),
-        fecha_fin: this.getDatePlusDays(this.getCurrentDate(), 10),
-        proyecto_id: this.randomChoice(projects).id,
-        usuario_asignado_id: admin.id,
-        creado_por: admin.id
-      },
-      {
-        titulo: 'Backup y recuperación',
-        descripcion: 'Implementar sistema de backup y procedimientos de recuperación.',
-        estado: 'pendiente',
-        prioridad: 'baja',
-        fecha_inicio: this.getCurrentDate(),
-        fecha_fin: this.getDatePlusDays(this.getCurrentDate(), 7),
-        proyecto_id: this.randomChoice(projects).id,
-        usuario_asignado_id: admin.id,
-        creado_por: admin.id
-      },
-      {
-        titulo: 'Documentación técnica general',
-        descripcion: 'Crear documentación técnica general para todos los proyectos.',
-        estado: 'en_progreso',
-        prioridad: 'media',
-        fecha_inicio: this.getDateMinusDays(this.getCurrentDate(), 10),
-        fecha_fin: this.getDatePlusDays(this.getCurrentDate(), 20),
-        proyecto_id: this.randomChoice(projects).id,
-        usuario_asignado_id: admin.id,
-        creado_por: admin.id
-      }
-    ];
-
-    for (const taskData of specificTasks) {
-      await this.insertIfNotExists('tareas', taskData, ['titulo', 'proyecto_id']);
-    }
+    return array;
   }
 
   /**

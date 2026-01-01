@@ -204,6 +204,71 @@ class ProjectController {
   }
 
   /**
+   * Obtener detalles completos del proyecto
+   * GET /api/projects/:id/details
+   * Permisos: Admin o Responsable del proyecto
+   * 
+   * Subtask 4.1: Implement controller method
+   * Subtask 4.2: Implement error handling in controller
+   * Requirements: 2.1, 2.2, 2.3, 12.2, 12.3, 12.4
+   */
+  async getProjectDetails(req, res, next) {
+    try {
+      // Extract projectId from req.params.id
+      const projectId = parseInt(req.params.id);
+      
+      // Extract user info from req.user (authenticated request)
+      const userId = req.user.id;
+      const isAdmin = req.user.es_administrador || false;
+
+      // Call projectService.getProjectDetails()
+      const projectDetails = await this.projectService.getProjectDetails(
+        projectId,
+        userId,
+        isAdmin
+      );
+
+      // Return 200 with data on success
+      res.status(200).json({
+        success: true,
+        data: projectDetails
+      });
+
+    } catch (error) {
+      // Subtask 4.2: Error handling
+      // Catch ValidationError → return 400
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      // Catch NotFoundError → return 404
+      if (error.name === 'NotFoundError') {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      // Catch ForbiddenError → return 403
+      if (error.name === 'ForbiddenError') {
+        return res.status(403).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      // Catch other errors → return 500
+      console.error('Error obteniendo detalles del proyecto:', error);
+      
+      // Use next(error) to pass to error handler middleware
+      next(error);
+    }
+  }
+
+  /**
    * Actualizar proyecto
    * PUT /api/projects/:id
    * Permisos: Admin o Responsable del proyecto

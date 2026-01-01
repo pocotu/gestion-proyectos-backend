@@ -919,6 +919,147 @@ describe('Projects Integration Tests - MVP', () => {
     }, 45000);
   });
 
+  describe('GET /api/projects/:id/details', () => {
+    test('Debe obtener detalles completos del proyecto con usuario autorizado', async () => {
+      logger.info('Test: Obtener detalles completos del proyecto');
+      
+      const { headers: adminHeaders, user: adminUser, token: adminToken } = await authHelper.createAdminAndGetToken();
+      
+      // Crear proyecto de prueba
+      const project = await createTestProject({
+        ...getTestProjectData(),
+        titulo: 'Proyecto Detalles Test'
+      }, adminToken);
+
+      const response = await request(app)
+        .get(`/api/projects/${project.id}/details`)
+        .set(adminHeaders)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        data: {
+          project: expect.objectContaining({
+            id: project.id,
+            titulo: 'Proyecto Detalles Test'
+          }),
+          responsibles: expect.any(Array),
+          tasks: expect.any(Array),
+          files: expect.any(Array),
+          activityLogs: expect.any(Array),
+          statistics: expect.any(Object)
+        }
+      });
+      
+      logger.success('Detalles del proyecto obtenidos correctamente');
+    });
+
+    test('Debe fallar con ID de proyecto inválido', async () => {
+      logger.info('Test: Obtener detalles con ID inválido');
+      
+      const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();
+
+      const response = await request(app)
+        .get('/api/projects/invalid/details')
+        .set(adminHeaders);
+
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({
+        success: false,
+        message: expect.any(String)
+      });
+      
+      logger.success('Validación de ID inválido funcionando');
+    });
+
+    test('Debe fallar con proyecto no existente', async () => {
+      logger.info('Test: Obtener detalles de proyecto no existente');
+      
+      const { headers: adminHeaders } = await authHelper.createAdminAndGetToken();
+
+      const response = await request(app)
+        .get('/api/projects/999999/details')
+        .set(adminHeaders);
+
+      expect(response.status).toBe(404);
+      expect(response.body).toMatchObject({
+        success: false,
+        message: expect.any(String)
+      });
+      
+      logger.success('Manejo de proyecto no existente funcionando');
+    });
+
+    test('Debe fallar con usuario no autorizado', async () => {
+      logger.info('Test: Obtener detalles sin autorización');
+      
+      // Crear proyecto con admin
+      const { token: adminToken } = await authHelper.createAdminAndGetToken();
+      const project = await createTestProject({
+        ...getTestProjectData(),
+        titulo: 'Proyecto No Autorizado Test'
+      }, adminToken);
+
+      // Intentar acceder con usuario regular no responsable
+      const { headers: userHeaders } = await authHelper.createUserAndGetToken({
+        email: `unauthorized-${Date.now()}@example.com`
+      });
+
+      const response = await request(app)
+        .get(`/api/projects/${project.id}/details`)
+        .set(userHeaders);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        success: false,
+        message: expect.any(String)
+      });
+      
+      logger.success('Control de autorización funcionando');
+    });
+
+    test('Debe verificar estructura de respuesta completa', async () => {
+      logger.info('Test: Verificar estructura de respuesta');
+      
+      const { headers: adminHeaders, token: adminToken } = await authHelper.createAdminAndGetToken();
+      
+      // Crear proyecto
+      const project = await createTestProject({
+        ...getTestProjectData(),
+        titulo: 'Proyecto Estructura Test'
+      }, adminToken);
+
+      const response = await request(app)
+        .get(`/api/projects/${project.id}/details`)
+        .set(adminHeaders)
+        .expect(200);
+
+      // Verificar estructura completa
+      expect(response.body.data).toHaveProperty('project');
+      expect(response.body.data).toHaveProperty('responsibles');
+      expect(response.body.data).toHaveProperty('tasks');
+      expect(response.body.data).toHaveProperty('files');
+      expect(response.body.data).toHaveProperty('activityLogs');
+      expect(response.body.data).toHaveProperty('statistics');
+
+      // Verificar estructura de project
+      expect(response.body.data.project).toHaveProperty('id');
+      expect(response.body.data.project).toHaveProperty('titulo');
+      expect(response.body.data.project).toHaveProperty('descripcion');
+      expect(response.body.data.project).toHaveProperty('estado');
+      expect(response.body.data.project).toHaveProperty('creator_name');
+
+      // Verificar estructura de statistics
+      expect(response.body.data.statistics).toHaveProperty('totalTasks');
+      expect(response.body.data.statistics).toHaveProperty('tasksByStatus');
+      expect(response.body.data.statistics).toHaveProperty('tasksByPriority');
+      expect(response.body.data.statistics).toHaveProperty('totalFiles');
+      expect(response.body.data.statistics).toHaveProperty('totalResponsibles');
+      
+      logger.success('Estructura de respuesta verificada correctamente');
+    });
+  });
+
   describe('Flujo completo de gestión de proyectos', () => {
     test('Debe completar flujo: crear -> obtener -> actualizar -> cambiar estado -> eliminar', async () => {
       logger.info('Test: Flujo completo de gestión de proyectos');

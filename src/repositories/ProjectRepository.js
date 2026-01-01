@@ -851,6 +851,301 @@ class ProjectRepository extends BaseRepository {
       throw error;
     }
   }
+
+  /**
+   * Get complete project details with creator information
+   * @param {number} projectId - Project ID
+   * @returns {Promise<Object|null>} Project with creator details or null if not found
+   */
+  async getProjectWithCreator(projectId) {
+    try {
+      const { pool } = require('../config/db');
+      const query = `
+        SELECT 
+          p.id,
+          p.titulo,
+          p.descripcion,
+          p.fecha_inicio,
+          p.fecha_fin,
+          p.estado,
+          p.creado_por,
+          p.created_at,
+          p.updated_at,
+          u.nombre as creator_name,
+          u.email as creator_email
+        FROM proyectos p
+        INNER JOIN usuarios u ON p.creado_por = u.id
+        WHERE p.id = ?
+      `;
+      
+      const [rows] = await pool.execute(query, [projectId]);
+      return rows.length > 0 ? rows[0] : null;
+    } catch (error) {
+      console.error('Error en ProjectRepository.getProjectWithCreator:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all responsibles assigned to a project
+   * @param {number} projectId - Project ID
+   * @returns {Promise<Array>} List of users with their roles
+   */
+  async getProjectResponsibles(projectId) {
+    try {
+      const { pool } = require('../config/db');
+      const query = `
+        SELECT 
+          pr.id,
+          pr.usuario_id,
+          pr.rol_responsabilidad,
+          pr.fecha_asignacion,
+          pr.fecha_fin,
+          pr.activo,
+          u.nombre,
+          u.email
+        FROM proyecto_responsables pr
+        INNER JOIN usuarios u ON pr.usuario_id = u.id
+        WHERE pr.proyecto_id = ? AND pr.activo = true
+        ORDER BY 
+          CASE pr.rol_responsabilidad
+            WHEN 'responsable_principal' THEN 1
+            WHEN 'responsable_secundario' THEN 2
+            WHEN 'supervisor' THEN 3
+            WHEN 'colaborador' THEN 4
+            ELSE 5
+          END,
+          u.nombre ASC
+      `;
+      
+      const [rows] = await pool.execute(query, [projectId]);
+      return rows;
+    } catch (error) {
+      console.error('Error en ProjectRepository.getProjectResponsibles:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all tasks for a project with assigned user info
+   * @param {number} projectId - Project ID
+   * @returns {Promise<Array>} List of tasks
+   */
+  async getProjectTasks(projectId) {
+    try {
+      const { pool } = require('../config/db');
+      const query = `
+        SELECT 
+          t.id,
+          t.titulo,
+          t.descripcion,
+          t.fecha_inicio,
+          t.fecha_fin,
+          t.estado,
+          t.prioridad,
+          t.proyecto_id,
+          t.usuario_asignado_id,
+          t.creado_por,
+          t.created_at,
+          t.updated_at,
+          u.nombre as assignee_name,
+          u.email as assignee_email
+        FROM tareas t
+        LEFT JOIN usuarios u ON t.usuario_asignado_id = u.id
+        WHERE t.proyecto_id = ?
+        ORDER BY t.created_at DESC
+      `;
+      
+      const [rows] = await pool.execute(query, [projectId]);
+      return rows;
+    } catch (error) {
+      console.error('Error en ProjectRepository.getProjectTasks:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all files attached to a project
+   * @param {number} projectId - Project ID
+   * @returns {Promise<Array>} List of files
+   */
+  async getProjectFiles(projectId) {
+    try {
+      const { pool } = require('../config/db');
+      const query = `
+        SELECT 
+          a.id,
+          a.proyecto_id,
+          a.nombre_archivo,
+          a.nombre_original,
+          a.tipo,
+          a.tamaño_bytes,
+          a.ruta_archivo,
+          a.subido_por,
+          a.created_at,
+          u.nombre as uploader_name,
+          u.email as uploader_email
+        FROM archivos_proyecto a
+        INNER JOIN usuarios u ON a.subido_por = u.id
+        WHERE a.proyecto_id = ?
+        ORDER BY a.created_at DESC
+      `;
+      
+      const [rows] = await pool.execute(query, [projectId]);
+      return rows;
+    } catch (error) {
+      console.error('Error en ProjectRepository.getProjectFiles:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get recent activity logs for a project
+   * @param {number} projectId - Project ID
+   * @param {number} limit - Maximum number of logs (default: 20)
+   * @returns {Promise<Array>} List of activity logs
+   */
+  async getProjectActivityLogs(projectId, limit = 20) {
+    try {
+      const { pool } = require('../config/db');
+      // Ensure limit is an integer and within safe bounds
+      const limitInt = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+      
+      // Note: LIMIT clause cannot use parameter placeholders in MySQL prepared statements
+      // We validate and sanitize the limit value above to prevent SQL injection
+      const query = `
+        SELECT 
+          l.id,
+          l.usuario_id,
+          l.accion,
+          l.entidad_tipo,
+          l.entidad_id,
+          l.descripcion,
+          l.created_at,
+          u.nombre as user_name,
+          u.email as user_email
+        FROM logs_actividad l
+        INNER JOIN usuarios u ON l.usuario_id = u.id
+        WHERE l.entidad_tipo = ? AND l.entidad_id = ?
+        ORDER BY l.created_at DESC
+        LIMIT ${limitInt}
+      `;
+      
+      const [rows] = await pool.execute(query, ['proyecto', projectId]);
+      return rows;
+    } catch (error) {
+      console.error('Error en ProjectRepository.getProjectActivityLogs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get project statistics (task counts by status, etc.)
+   * @param {number} projectId - Project ID
+   * @returns {Promise<Object>} Statistics object
+   */
+  async getProjectStatistics(projectId) {
+    try {
+      const { pool } = require('../config/db');
+      
+      // Count tasks by status
+      const tasksByStatusQuery = `
+        SELECT 
+          estado,
+          COUNT(*) as count
+        FROM tareas
+        WHERE proyecto_id = ?
+        GROUP BY estado
+      `;
+      
+      // Count tasks by priority
+      const tasksByPriorityQuery = `
+        SELECT 
+          prioridad,
+          COUNT(*) as count
+        FROM tareas
+        WHERE proyecto_id = ?
+        GROUP BY prioridad
+      `;
+      
+      // Count total files
+      const filesCountQuery = `
+        SELECT COUNT(*) as count
+        FROM archivos_proyecto
+        WHERE proyecto_id = ?
+      `;
+      
+      // Count total responsibles
+      const responsiblesCountQuery = `
+        SELECT COUNT(*) as count
+        FROM proyecto_responsables
+        WHERE proyecto_id = ? AND activo = true
+      `;
+      
+      const [tasksByStatus] = await pool.execute(tasksByStatusQuery, [projectId]);
+      const [tasksByPriority] = await pool.execute(tasksByPriorityQuery, [projectId]);
+      const [filesCount] = await pool.execute(filesCountQuery, [projectId]);
+      const [responsiblesCount] = await pool.execute(responsiblesCountQuery, [projectId]);
+      
+      // Build statistics object
+      const statistics = {
+        totalTasks: 0,
+        tasksByStatus: {
+          pendiente: 0,
+          en_progreso: 0,
+          completada: 0,
+          cancelada: 0
+        },
+        tasksByPriority: {
+          baja: 0,
+          media: 0,
+          alta: 0
+        },
+        totalFiles: filesCount[0].count,
+        totalResponsibles: responsiblesCount[0].count
+      };
+      
+      // Populate tasksByStatus
+      tasksByStatus.forEach(row => {
+        statistics.tasksByStatus[row.estado] = row.count;
+        statistics.totalTasks += row.count;
+      });
+      
+      // Populate tasksByPriority
+      tasksByPriority.forEach(row => {
+        statistics.tasksByPriority[row.prioridad] = row.count;
+      });
+      
+      return statistics;
+    } catch (error) {
+      console.error('Error en ProjectRepository.getProjectStatistics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if user is a responsible for the project
+   * @param {number} projectId - Project ID
+   * @param {number} userId - User ID
+   * @returns {Promise<boolean>} True if user is responsible
+   */
+  async isUserProjectResponsible(projectId, userId) {
+    try {
+      const { pool } = require('../config/db');
+      const query = `
+        SELECT 1
+        FROM proyecto_responsables
+        WHERE proyecto_id = ? AND usuario_id = ? AND activo = true
+        LIMIT 1
+      `;
+      
+      const [rows] = await pool.execute(query, [projectId, userId]);
+      return rows.length > 0;
+    } catch (error) {
+      console.error('Error en ProjectRepository.isUserProjectResponsible:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = ProjectRepository;

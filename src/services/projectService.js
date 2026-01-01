@@ -2,7 +2,7 @@ const ProjectRepository = require('../repositories/ProjectRepository');
 const ProjectResponsibleRepository = require('../repositories/ProjectResponsibleRepository');
 const UserRepository = require('../repositories/UserRepository');
 const LogActivityRepository = require('../repositories/LogActivityRepository');
-const { NotFoundError, ValidationError, ConflictError } = require('../utils/errors');
+const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors');
 
 /**
  * ProjectService - Servicio para gestión de proyectos
@@ -560,6 +560,97 @@ class ProjectService {
     } catch (error) {
       console.error('Error en ProjectService.search:', error);
       throw new Error('Error buscando proyectos');
+    }
+  }
+
+  /**
+   * Get complete project details with all related data
+   * Subtask 2.1: Input validation
+   * Subtask 2.2: Project existence check
+   * Subtask 2.3: Authorization logic
+   * Subtask 2.4: Data aggregation
+   * Subtask 2.5: Activity logging
+   * 
+   * @param {number} projectId - Project ID
+   * @param {number} userId - Requesting user ID
+   * @param {boolean} isAdmin - Whether user is admin
+   * @returns {Promise<Object>} Complete project details
+   * @throws {ValidationError} If project ID is invalid
+   * @throws {NotFoundError} If project doesn't exist
+   * @throws {ForbiddenError} If user lacks permission
+   */
+  async getProjectDetails(projectId, userId, isAdmin = false) {
+    try {
+      // Subtask 2.1: Validate projectId is a positive integer
+      if (!projectId || isNaN(projectId) || projectId <= 0 || !Number.isInteger(Number(projectId))) {
+        throw new ValidationError('ID de proyecto inválido');
+      }
+
+      // Convert to number if it's a string
+      const numericProjectId = Number(projectId);
+
+      // Subtask 2.2: Check if project exists
+      const project = await this.projectRepository.getProjectWithCreator(numericProjectId);
+      if (!project) {
+        throw new NotFoundError('Proyecto no encontrado');
+      }
+
+      // Subtask 2.3: Implement authorization logic
+      // Check if user is admin (allow access)
+      if (!isAdmin) {
+        // Check if user is project responsible (allow access)
+        const isResponsible = await this.projectRepository.isUserProjectResponsible(numericProjectId, userId);
+        if (!isResponsible) {
+          throw new ForbiddenError('No tiene permisos para ver este proyecto');
+        }
+      }
+
+      // Subtask 2.4: Implement data aggregation
+      // Call all repository methods to fetch related data
+      const [responsibles, tasks, files, activityLogs, statistics] = await Promise.all([
+        this.projectRepository.getProjectResponsibles(numericProjectId),
+        this.projectRepository.getProjectTasks(numericProjectId),
+        this.projectRepository.getProjectFiles(numericProjectId),
+        this.projectRepository.getProjectActivityLogs(numericProjectId, 20),
+        this.projectRepository.getProjectStatistics(numericProjectId)
+      ]);
+
+      // Subtask 2.5: Implement activity logging
+      // Create log entry with action "viewed"
+      // Log should not fail the main operation if it errors
+      try {
+        await this.logActivityRepository.logActivity({
+          usuario_id: userId,
+          accion: 'viewed',
+          entidad_tipo: 'proyecto',
+          entidad_id: numericProjectId,
+          descripcion: `Proyecto "${project.titulo}" visualizado`,
+          ip_address: null // Will be set by controller if available
+        });
+      } catch (logError) {
+        console.error('Error logging project view:', logError);
+        // Don't fail the main operation
+      }
+
+      // Combine results into single response object
+      return {
+        project,
+        responsibles,
+        tasks,
+        files,
+        activityLogs,
+        statistics
+      };
+    } catch (error) {
+      // Re-throw known errors
+      if (error instanceof ValidationError || 
+          error instanceof NotFoundError || 
+          error instanceof ForbiddenError) {
+        throw error;
+      }
+      // Log and throw generic error for unexpected issues
+      console.error('Error en ProjectService.getProjectDetails:', error);
+      throw new Error('Error obteniendo detalles del proyecto');
     }
   }
 }

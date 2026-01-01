@@ -18,6 +18,15 @@ global.testLogger = new TestLogger();
  * Setup que se ejecuta una vez antes de todos los tests
  */
 beforeAll(async () => {
+  // Skip database setup for static analysis tests (property tests that don't need DB)
+  const testPath = expect.getState().testPath || '';
+  const isStaticAnalysisTest = testPath.includes('ProjectRepository.pbt.test.js');
+  
+  if (isStaticAnalysisTest) {
+    global.testLogger.info('⏭️  Skipping database setup for static analysis test');
+    return;
+  }
+  
   global.testLogger.info('🚀 Iniciando setup global de tests de integración');
   
   try {
@@ -36,6 +45,15 @@ beforeAll(async () => {
  * Cleanup que se ejecuta una vez después de todos los tests
  */
 afterAll(async () => {
+  // Skip database cleanup for static analysis tests
+  const testPath = expect.getState().testPath || '';
+  const isStaticAnalysisTest = testPath.includes('ProjectRepository.pbt.test.js');
+  
+  if (isStaticAnalysisTest) {
+    global.testLogger.info('⏭️  Skipping database cleanup for static analysis test');
+    return;
+  }
+  
   global.testLogger.info('🧹 Iniciando cleanup global de tests');
   
   try {

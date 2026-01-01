@@ -68,6 +68,14 @@ router.post('/',
   projectController.createProject.bind(projectController)
 );
 
+// Obtener detalles completos del proyecto
+// GET /api/projects/:id/details
+// Permisos: Admin o Responsable del proyecto
+// Requirements: 2.1, 7.1
+router.get('/:id/details', 
+  projectController.getProjectDetails.bind(projectController)
+);
+
 // Obtener proyecto por ID
 // GET /api/projects/:id
 // Permisos: Solo responsables del proyecto y admin
