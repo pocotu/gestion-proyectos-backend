@@ -99,35 +99,45 @@ class MigrationManager {
   async runMigrations() {
     console.log('[MIGRATE] Iniciando sistema de migraciones...');
     
-    await this.ensureDatabase();
-    
-    const connection = await this.createConnection();
-    
     try {
-      await this.createMigrationsTable(connection);
+      await this.ensureDatabase();
       
-      const executedMigrations = await this.getExecutedMigrations(connection);
-      const migrationFiles = await this.getMigrationFiles();
+      const connection = await this.createConnection();
       
-      const pendingMigrations = migrationFiles.filter(
-        file => !executedMigrations.includes(file)
-      );
-      
-      if (pendingMigrations.length === 0) {
-        console.log('[INFO] No hay migraciones pendientes');
-        return;
+      try {
+        await this.createMigrationsTable(connection);
+        
+        const executedMigrations = await this.getExecutedMigrations(connection);
+        const migrationFiles = await this.getMigrationFiles();
+        
+        console.log(`[MIGRATE] Migraciones ejecutadas: ${executedMigrations.length}`);
+        console.log(`[MIGRATE] Archivos de migración encontrados: ${migrationFiles.length}`);
+        
+        const pendingMigrations = migrationFiles.filter(
+          file => !executedMigrations.includes(file)
+        );
+        
+        if (pendingMigrations.length === 0) {
+          console.log('[INFO] No hay migraciones pendientes');
+          return;
+        }
+        
+        console.log(`[INFO] Migraciones pendientes: ${pendingMigrations.length}`);
+        console.log(`[INFO] Archivos pendientes:`, pendingMigrations);
+        
+        for (const migration of pendingMigrations) {
+          await this.executeMigration(connection, migration);
+        }
+        
+        console.log('[SUCCESS] Todas las migraciones completadas');
+        
+      } finally {
+        await connection.end();
       }
-      
-      console.log(`[INFO] Migraciones pendientes: ${pendingMigrations.length}`);
-      
-      for (const migration of pendingMigrations) {
-        await this.executeMigration(connection, migration);
-      }
-      
-      console.log('[SUCCESS] Todas las migraciones completadas');
-      
-    } finally {
-      await connection.end();
+    } catch (error) {
+      console.error('[ERROR] Error en runMigrations:', error.message);
+      console.error('[ERROR] Stack:', error.stack);
+      throw error;
     }
   }
 

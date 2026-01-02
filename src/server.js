@@ -78,7 +78,12 @@ async function start() {
         await migrationManager.runMigrations();
         logger.info('Migrations completed successfully');
       } catch (migrationError) {
-        logger.warn('Migrations failed, continuing with table creation:', migrationError.message);
+        logger.error('Migrations failed with error:', {
+          message: migrationError.message,
+          stack: migrationError.stack,
+          code: migrationError.code
+        });
+        console.error('💥 [MIGRATION-ERROR] Full error details:', migrationError);
         // Continuar con el setup normal aunque fallen las migraciones
       }
 
