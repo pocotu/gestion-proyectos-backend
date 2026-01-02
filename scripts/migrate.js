@@ -141,6 +141,7 @@ class MigrationManager {
         'usuario_roles',
         'usuarios',
         'roles',
+        'migrations', // Importante: limpiar también la tabla de migraciones
       ];
 
       for (const table of tables) {
