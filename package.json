@@ -14,6 +14,7 @@
     "migrate:clean": "node scripts/migrate.js clean",
     "migrate:reset": "node scripts/migrate.js reset",
     "db:clean": "node scripts/clean-database.js",
+    "db:check": "node scripts/check-tables.js",
     "seed": "node src/seeders/index.js",
     "seed:refresh": "node src/seeders/index.js refresh",
     "seed:truncate": "node src/seeders/index.js truncate",

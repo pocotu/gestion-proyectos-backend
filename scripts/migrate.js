@@ -73,11 +73,27 @@ class MigrationManager {
     const sql = await fs.readFile(filePath, 'utf8');
     
     console.log(`[MIGRATE] Ejecutando: ${filename}`);
+    console.log(`[MIGRATE] Tamaño del archivo: ${sql.length} caracteres`);
     
-    await connection.query(sql);
-    await connection.query('INSERT INTO migrations (name) VALUES (?)', [filename]);
-    
-    console.log(`[SUCCESS] Completado: ${filename}`);
+    try {
+      await connection.query(sql);
+      await connection.query('INSERT INTO migrations (name) VALUES (?)', [filename]);
+      
+      console.log(`[SUCCESS] Completado: ${filename}`);
+      
+      // Verificar que tarea_asignaciones se creó
+      if (filename.includes('001_complete_schema')) {
+        const [tables] = await connection.query("SHOW TABLES LIKE 'tarea_asignaciones'");
+        if (tables.length > 0) {
+          console.log('[SUCCESS] ✅ Tabla tarea_asignaciones creada correctamente');
+        } else {
+          console.log('[ERROR] ❌ Tabla tarea_asignaciones NO se creó');
+        }
+      }
+    } catch (error) {
+      console.error(`[ERROR] Error ejecutando ${filename}:`, error.message);
+      throw error;
+    }
   }
 
   async runMigrations() {
