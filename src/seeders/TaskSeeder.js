@@ -43,6 +43,10 @@ class TaskSeeder extends BaseSeeder {
 
     const createdTasks = [];
     let totalTasksCreated = 0;
+    let totalAssignmentsCreated = 0;
+
+    // Obtener todos los usuarios para asignaciones
+    const allUsers = await this.execute('SELECT id, nombre FROM usuarios');
 
     // Crear exactamente 20 tareas para cada proyecto
     for (const project of projects) {
@@ -61,16 +65,48 @@ class TaskSeeder extends BaseSeeder {
         if (taskId) {
           createdTasks.push({ id: taskId, ...taskData, proyecto_id: project.id });
           totalTasksCreated++;
+
+          // Crear asignación en tarea_asignaciones
+          const assignmentId = await this.insertIfNotExists('tarea_asignaciones', {
+            tarea_id: taskId,
+            usuario_id: admin.id,
+            rol_asignacion: 'responsable_principal',
+            asignado_por: admin.id,
+            activo: true
+          }, ['tarea_id', 'usuario_id']);
+
+          if (assignmentId) {
+            totalAssignmentsCreated++;
+          }
+
+          // Para algunas tareas, agregar colaboradores adicionales (30% de las tareas)
+          if (Math.random() < 0.3 && allUsers.length > 1) {
+            const randomUser = allUsers[Math.floor(Math.random() * allUsers.length)];
+            if (randomUser.id !== admin.id) {
+              await this.insertIfNotExists('tarea_asignaciones', {
+                tarea_id: taskId,
+                usuario_id: randomUser.id,
+                rol_asignacion: 'colaborador',
+                asignado_por: admin.id,
+                activo: true
+              }, ['tarea_id', 'usuario_id']);
+              totalAssignmentsCreated++;
+            }
+          }
         }
       }
     }
 
     // Verificar que las tareas fueron creadas
     const totalTasks = await this.execute('SELECT COUNT(*) as count FROM tareas');
+    const totalAssignments = await this.execute('SELECT COUNT(*) as count FROM tarea_asignaciones WHERE activo = TRUE');
     console.log(`✅ Tasks seeded successfully. Total tasks: ${totalTasks[0].count}`);
+    console.log(`✅ Task assignments created: ${totalAssignments[0].count}`);
     console.log(`📊 Tasks created in this run: ${totalTasksCreated}`);
+    console.log(`📊 Assignments created in this run: ${totalAssignmentsCreated}`);
     console.log(`📊 Projects with tasks: ${projects.length}`);
     console.log(`📊 Average tasks per project: ${(totalTasks[0].count / projects.length).toFixed(1)}`);
+    console.log(`📊 Average assignments per task: ${(totalAssignments[0].count / totalTasks[0].count).toFixed(1)}`);
 
     // Mostrar distribución por estado
     const distribution = await this.execute(`
