@@ -615,6 +615,21 @@ class ProjectService {
         this.projectRepository.getProjectStatistics(numericProjectId)
       ]);
 
+      // Fetch assignments for each task
+      const TaskAssignmentRepository = require('../repositories/TaskAssignmentRepository');
+      const taskAssignmentRepo = new TaskAssignmentRepository();
+      
+      // Add assignments to each task
+      const tasksWithAssignments = await Promise.all(
+        tasks.map(async (task) => {
+          const assignments = await taskAssignmentRepo.getAssignmentsByTaskId(task.id);
+          return {
+            ...task,
+            asignaciones: assignments
+          };
+        })
+      );
+
       // Subtask 2.5: Implement activity logging
       // Create log entry with action "viewed"
       // Log should not fail the main operation if it errors
@@ -636,7 +651,7 @@ class ProjectService {
       return {
         project,
         responsibles,
-        tasks,
+        tasks: tasksWithAssignments,
         files,
         activityLogs,
         statistics

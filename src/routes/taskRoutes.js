@@ -343,4 +343,48 @@ router.get('/:id/history',
   }
 );
 
+/**
+ * Rutas de asignaciones múltiples (NUEVAS)
+ */
+
+// Obtener todas las asignaciones de una tarea
+// GET /api/tasks/:id/assignments
+// Permisos: Admin, Responsable del proyecto, o usuario asignado
+router.get('/:id/assignments',
+  requireTaskAccess('read'),
+  taskController.getTaskAssignments.bind(taskController)
+);
+
+// Asignar usuario a tarea (asignación múltiple)
+// POST /api/tasks/:id/assignments
+// Permisos: Admin o Responsable del proyecto
+router.post('/:id/assignments',
+  requirePermission('tasks', 'update'),
+  taskController.assignUserToTask.bind(taskController)
+);
+
+// Sincronizar todas las asignaciones de una tarea
+// PUT /api/tasks/:id/assignments
+// Permisos: Admin o Responsable del proyecto
+router.put('/:id/assignments',
+  requirePermission('tasks', 'update'),
+  taskController.syncTaskAssignments.bind(taskController)
+);
+
+// Actualizar rol de una asignación
+// PATCH /api/tasks/:id/assignments/:userId
+// Permisos: Admin o Responsable del proyecto
+router.patch('/:id/assignments/:userId',
+  requirePermission('tasks', 'update'),
+  taskController.updateAssignmentRole.bind(taskController)
+);
+
+// Desasignar usuario de tarea (asignación múltiple)
+// DELETE /api/tasks/:id/assignments/:userId
+// Permisos: Admin o Responsable del proyecto
+router.delete('/:id/assignments/:userId',
+  requirePermission('tasks', 'update'),
+  taskController.unassignUserFromTask.bind(taskController)
+);
+
 module.exports = router;

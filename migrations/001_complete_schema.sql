@@ -84,6 +84,24 @@ CREATE TABLE IF NOT EXISTS tareas (
     FOREIGN KEY (creado_por) REFERENCES usuarios(id)
 );
 
+-- Tabla de Asignaciones de Tareas (Muchos a Muchos)
+-- Permite asignar múltiples usuarios a una misma tarea
+CREATE TABLE IF NOT EXISTS tarea_asignaciones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    tarea_id INT NOT NULL,
+    usuario_id INT NOT NULL,
+    rol_asignacion ENUM('responsable_principal', 'colaborador', 'revisor') DEFAULT 'colaborador',
+    fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    asignado_por INT,
+    activo BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (tarea_id) REFERENCES tareas(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (asignado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
+    UNIQUE KEY unique_tarea_usuario (tarea_id, usuario_id)
+);
+
 -- Tabla Archivos Proyecto (CON SOPORTE CLOUDINARY)
 CREATE TABLE IF NOT EXISTS archivos_proyecto (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -130,10 +148,12 @@ CREATE TABLE IF NOT EXISTS logs_actividad (
 );
 
 -- Indices
-CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email);
-CREATE INDEX IF NOT EXISTS idx_proyectos_creado_por ON proyectos(creado_por);
-CREATE INDEX IF NOT EXISTS idx_tareas_proyecto ON tareas(proyecto_id);
-CREATE INDEX IF NOT EXISTS idx_tareas_usuario ON tareas(usuario_asignado_id);
+CREATE INDEX idx_usuarios_email ON usuarios(email);
+CREATE INDEX idx_proyectos_creado_por ON proyectos(creado_por);
+CREATE INDEX idx_tareas_proyecto ON tareas(proyecto_id);
+CREATE INDEX idx_tareas_usuario ON tareas(usuario_asignado_id);
+CREATE INDEX idx_tarea_asignaciones_tarea ON tarea_asignaciones(tarea_id);
+CREATE INDEX idx_tarea_asignaciones_usuario ON tarea_asignaciones(usuario_id);
 
 -- Seed Roles por defecto
 INSERT INTO roles (nombre) VALUES ('admin'), ('responsable_proyecto'), ('responsable_tarea')

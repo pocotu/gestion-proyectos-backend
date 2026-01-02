@@ -811,6 +811,215 @@ class TaskService {
       return false;
     }
   }
+
+  /**
+   * Obtener todas las asignaciones de una tarea
+   * @param {number} taskId - ID de la tarea
+   * @returns {Promise<Array>} Lista de usuarios asignados
+   */
+  async getTaskAssignments(taskId) {
+    try {
+      return await this.taskAssignmentRepository.getAssignmentsByTaskId(taskId);
+    } catch (error) {
+      console.error('Error en TaskService.getTaskAssignments:', error);
+      throw new Error('Error obteniendo asignaciones de la tarea');
+    }
+  }
+
+  /**
+   * Asignar un usuario a una tarea
+   * @param {number} taskId - ID de la tarea
+   * @param {number} userId - ID del usuario a asignar
+   * @param {Object} options - Opciones adicionales
+   * @returns {Promise<Object>} Asignación creada
+   */
+  async assignUserToTask(taskId, userId, options = {}) {
+    try {
+      const { rol_asignacion = 'colaborador', asignado_por, ipAddress = null } = options;
+
+      // Verificar que la tarea existe
+      const task = await this.taskRepository.findById(taskId);
+      if (!task) {
+        throw new Error('Tarea no encontrada');
+      }
+
+      // Verificar si ya existe la asignación
+      const exists = await this.taskAssignmentRepository.assignmentExists(taskId, userId);
+      if (exists) {
+        throw new Error('El usuario ya está asignado a esta tarea');
+      }
+
+      // Crear la asignación
+      const assignment = await this.taskAssignmentRepository.createAssignment({
+        tarea_id: taskId,
+        usuario_id: userId,
+        rol_asignacion,
+        asignado_por
+      });
+
+      // Registrar actividad
+      try {
+        await this.logActivityRepository.logActivity({
+          usuario_id: asignado_por,
+          accion: 'asignar',
+          entidad_tipo: 'tarea',
+          entidad_id: taskId,
+          descripcion: `Usuario asignado a tarea "${task.titulo}"`,
+          ip_address: ipAddress
+        });
+      } catch (logError) {
+        console.error('Error logging task assignment:', logError);
+      }
+
+      return assignment;
+    } catch (error) {
+      console.error('Error en TaskService.assignUserToTask:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Desasignar un usuario de una tarea
+   * @param {number} taskId - ID de la tarea
+   * @param {number} userId - ID del usuario a desasignar
+   * @param {Object} options - Opciones adicionales
+   * @returns {Promise<boolean>} True si se desasignó
+   */
+  async unassignUserFromTask(taskId, userId, options = {}) {
+    try {
+      const { removedBy, ipAddress = null } = options;
+
+      // Verificar que la tarea existe
+      const task = await this.taskRepository.findById(taskId);
+      if (!task) {
+        throw new Error('Tarea no encontrada');
+      }
+
+      // Eliminar la asignación
+      const removed = await this.taskAssignmentRepository.deleteAssignment(taskId, userId);
+
+      if (removed) {
+        // Registrar actividad
+        try {
+          await this.logActivityRepository.logActivity({
+            usuario_id: removedBy,
+            accion: 'desasignar',
+            entidad_tipo: 'tarea',
+            entidad_id: taskId,
+            descripcion: `Usuario desasignado de tarea "${task.titulo}"`,
+            ip_address: ipAddress
+          });
+        } catch (logError) {
+          console.error('Error logging task unassignment:', logError);
+        }
+      }
+
+      return removed;
+    } catch (error) {
+      console.error('Error en TaskService.unassignUserFromTask:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sincronizar asignaciones de una tarea
+   * Reemplaza todas las asignaciones actuales con la nueva lista
+   * @param {number} taskId - ID de la tarea
+   * @param {Array<number>} userIds - Lista de IDs de usuarios
+   * @param {Object} options - Opciones adicionales
+   * @returns {Promise<Object>} Resultado de la sincronización
+   */
+  async syncTaskAssignments(taskId, userIds, options = {}) {
+    try {
+      const { assignedBy, ipAddress = null } = options;
+
+      // Verificar que la tarea existe
+      const task = await this.taskRepository.findById(taskId);
+      if (!task) {
+        throw new Error('Tarea no encontrada');
+      }
+
+      // Sincronizar asignaciones
+      const result = await this.taskAssignmentRepository.syncAssignments(
+        taskId,
+        userIds,
+        assignedBy
+      );
+
+      // Registrar actividad
+      try {
+        await this.logActivityRepository.logActivity({
+          usuario_id: assignedBy,
+          accion: 'actualizar',
+          entidad_tipo: 'tarea',
+          entidad_id: taskId,
+          descripcion: `Asignaciones actualizadas en tarea "${task.titulo}" (${result.total} usuarios)`,
+          ip_address: ipAddress
+        });
+      } catch (logError) {
+        console.error('Error logging task assignment sync:', logError);
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error en TaskService.syncTaskAssignments:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar el rol de una asignación
+   * @param {number} taskId - ID de la tarea
+   * @param {number} userId - ID del usuario
+   * @param {string} newRole - Nuevo rol
+   * @param {Object} options - Opciones adicionales
+   * @returns {Promise<boolean>} True si se actualizó
+   */
+  async updateAssignmentRole(taskId, userId, newRole, options = {}) {
+    try {
+      const { updatedBy, ipAddress = null } = options;
+
+      // Verificar que la tarea existe
+      const task = await this.taskRepository.findById(taskId);
+      if (!task) {
+        throw new Error('Tarea no encontrada');
+      }
+
+      // Validar el rol
+      const validRoles = ['responsable_principal', 'colaborador', 'revisor'];
+      if (!validRoles.includes(newRole)) {
+        throw new Error('Rol inválido');
+      }
+
+      // Actualizar el rol
+      const updated = await this.taskAssignmentRepository.updateAssignmentRole(
+        taskId,
+        userId,
+        newRole
+      );
+
+      if (updated) {
+        // Registrar actividad
+        try {
+          await this.logActivityRepository.logActivity({
+            usuario_id: updatedBy,
+            accion: 'actualizar',
+            entidad_tipo: 'tarea',
+            entidad_id: taskId,
+            descripcion: `Rol de asignación actualizado en tarea "${task.titulo}"`,
+            ip_address: ipAddress
+          });
+        } catch (logError) {
+          console.error('Error logging assignment role update:', logError);
+        }
+      }
+
+      return updated;
+    } catch (error) {
+      console.error('Error en TaskService.updateAssignmentRole:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = TaskService;

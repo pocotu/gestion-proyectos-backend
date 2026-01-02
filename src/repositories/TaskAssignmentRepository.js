@@ -1,133 +1,213 @@
-const BaseRepository = require('./BaseRepository');
+const { pool } = require('../config/db');
 
 /**
- * Repositorio para gestionar las asignaciones de tareas
- * Maneja las operaciones CRUD para la tabla task_assignments
+ * TaskAssignmentRepository
+ * Maneja las operaciones de base de datos para asignaciones de tareas
+ * Siguiendo Single Responsibility Principle: Solo maneja persistencia de asignaciones
  */
-class TaskAssignmentRepository extends BaseRepository {
-  constructor() {
-    super('task_assignments');
-  }
-
+class TaskAssignmentRepository {
   /**
-   * Asignar usuario a una tarea
+   * Obtener todas las asignaciones de una tarea
    * @param {number} taskId - ID de la tarea
-   * @param {number} userId - ID del usuario
-   * @param {number} assignedBy - ID del usuario que asigna
-   * @returns {Promise<Object>} - Asignación creada
+   * @returns {Promise<Array>} Lista de asignaciones
    */
-  async assignUserToTask(taskId, userId, assignedBy) {
+  async getAssignmentsByTaskId(taskId) {
     const query = `
-      INSERT INTO ${this.tableName} (tarea_id, usuario_id, asignado_por, fecha_asignacion)
-      VALUES (?, ?, ?, NOW())
+      SELECT 
+        ta.id,
+        ta.tarea_id,
+        ta.usuario_id,
+        ta.rol_asignacion,
+        ta.fecha_asignacion,
+        ta.asignado_por,
+        ta.activo,
+        u.nombre as usuario_nombre,
+        u.email as usuario_email,
+        asignador.nombre as asignado_por_nombre
+      FROM tarea_asignaciones ta
+      INNER JOIN usuarios u ON ta.usuario_id = u.id
+      LEFT JOIN usuarios asignador ON ta.asignado_por = asignador.id
+      WHERE ta.tarea_id = ? AND ta.activo = TRUE
+      ORDER BY 
+        CASE ta.rol_asignacion
+          WHEN 'responsable_principal' THEN 1
+          WHEN 'colaborador' THEN 2
+          WHEN 'revisor' THEN 3
+        END,
+        ta.fecha_asignacion ASC
     `;
     
-    const result = await this.raw(query, [taskId, userId, assignedBy]);
-    return this.findById(result.insertId);
+    const [rows] = await pool.execute(query, [taskId]);
+    return rows;
   }
 
   /**
-   * Remover asignación de tarea
+   * Obtener todas las tareas asignadas a un usuario
+   * @param {number} userId - ID del usuario
+   * @returns {Promise<Array>} Lista de tareas asignadas
+   */
+  async getAssignmentsByUserId(userId) {
+    const query = `
+      SELECT 
+        ta.id,
+        ta.tarea_id,
+        ta.usuario_id,
+        ta.rol_asignacion,
+        ta.fecha_asignacion,
+        t.titulo as tarea_titulo,
+        t.estado as tarea_estado,
+        t.prioridad as tarea_prioridad,
+        t.proyecto_id,
+        p.titulo as proyecto_titulo
+      FROM tarea_asignaciones ta
+      INNER JOIN tareas t ON ta.tarea_id = t.id
+      INNER JOIN proyectos p ON t.proyecto_id = p.id
+      WHERE ta.usuario_id = ? AND ta.activo = TRUE
+      ORDER BY t.fecha_fin ASC
+    `;
+    
+    const [rows] = await pool.execute(query, [userId]);
+    return rows;
+  }
+
+  /**
+   * Crear una nueva asignación
+   * @param {Object} assignmentData - Datos de la asignación
+   * @returns {Promise<Object>} Asignación creada
+   */
+  async createAssignment(assignmentData) {
+    const { tarea_id, usuario_id, rol_asignacion = 'colaborador', asignado_por } = assignmentData;
+    
+    const query = `
+      INSERT INTO tarea_asignaciones 
+        (tarea_id, usuario_id, rol_asignacion, asignado_por, activo)
+      VALUES (?, ?, ?, ?, TRUE)
+    `;
+    
+    const [result] = await pool.execute(query, [
+      tarea_id,
+      usuario_id,
+      rol_asignacion,
+      asignado_por
+    ]);
+    
+    return {
+      id: result.insertId,
+      tarea_id,
+      usuario_id,
+      rol_asignacion,
+      asignado_por,
+      activo: true
+    };
+  }
+
+  /**
+   * Verificar si existe una asignación activa
    * @param {number} taskId - ID de la tarea
    * @param {number} userId - ID del usuario
-   * @returns {Promise<boolean>} - True si se removió exitosamente
+   * @returns {Promise<boolean>} True si existe
    */
-  async removeUserFromTask(taskId, userId) {
+  async assignmentExists(taskId, userId) {
     const query = `
-      DELETE FROM ${this.tableName}
+      SELECT COUNT(*) as count 
+      FROM tarea_asignaciones 
+      WHERE tarea_id = ? AND usuario_id = ? AND activo = TRUE
+    `;
+    
+    const [rows] = await pool.execute(query, [taskId, userId]);
+    return rows[0].count > 0;
+  }
+
+  /**
+   * Eliminar una asignación (soft delete)
+   * @param {number} taskId - ID de la tarea
+   * @param {number} userId - ID del usuario
+   * @returns {Promise<boolean>} True si se eliminó
+   */
+  async deleteAssignment(taskId, userId) {
+    const query = `
+      UPDATE tarea_asignaciones 
+      SET activo = FALSE 
       WHERE tarea_id = ? AND usuario_id = ?
     `;
     
-    const result = await this.raw(query, [taskId, userId]);
+    const [result] = await pool.execute(query, [taskId, userId]);
     return result.affectedRows > 0;
   }
 
   /**
-   * Obtener usuarios asignados a una tarea
+   * Eliminar todas las asignaciones de una tarea
    * @param {number} taskId - ID de la tarea
-   * @returns {Promise<Array>} - Lista de usuarios asignados
+   * @returns {Promise<number>} Número de asignaciones eliminadas
    */
-  async getTaskAssignments(taskId) {
+  async deleteAllAssignments(taskId) {
     const query = `
-      SELECT 
-        ta.*,
-        u.nombre,
-        u.email,
-        u.es_activo,
-        assigner.nombre as asignado_por_nombre
-      FROM ${this.tableName} ta
-      JOIN usuarios u ON ta.usuario_id = u.id
-      LEFT JOIN usuarios assigner ON ta.asignado_por = assigner.id
-      WHERE ta.tarea_id = ?
-      ORDER BY ta.fecha_asignacion DESC
+      UPDATE tarea_asignaciones 
+      SET activo = FALSE 
+      WHERE tarea_id = ?
     `;
     
-    return await this.raw(query, [taskId]);
+    const [result] = await pool.execute(query, [taskId]);
+    return result.affectedRows;
   }
 
   /**
-   * Obtener tareas asignadas a un usuario
-   * @param {number} userId - ID del usuario
-   * @returns {Promise<Array>} - Lista de tareas asignadas
-   */
-  async getUserTaskAssignments(userId) {
-    const query = `
-      SELECT 
-        ta.*,
-        t.titulo,
-        t.descripcion,
-        t.estado,
-        t.prioridad,
-        t.fecha_vencimiento,
-        p.nombre as proyecto_nombre
-      FROM ${this.tableName} ta
-      JOIN tareas t ON ta.tarea_id = t.id
-      LEFT JOIN proyectos p ON t.proyecto_id = p.id
-      WHERE ta.usuario_id = ?
-      ORDER BY ta.fecha_asignacion DESC
-    `;
-    
-    return await this.raw(query, [userId]);
-  }
-
-  /**
-   * Verificar si un usuario está asignado a una tarea
+   * Actualizar el rol de una asignación
    * @param {number} taskId - ID de la tarea
    * @param {number} userId - ID del usuario
-   * @returns {Promise<boolean>} - True si está asignado
+   * @param {string} newRole - Nuevo rol
+   * @returns {Promise<boolean>} True si se actualizó
    */
-  async isUserAssignedToTask(taskId, userId) {
+  async updateAssignmentRole(taskId, userId, newRole) {
     const query = `
-      SELECT COUNT(*) as count
-      FROM ${this.tableName}
-      WHERE tarea_id = ? AND usuario_id = ?
+      UPDATE tarea_asignaciones 
+      SET rol_asignacion = ? 
+      WHERE tarea_id = ? AND usuario_id = ? AND activo = TRUE
     `;
     
-    const result = await this.raw(query, [taskId, userId]);
-    return result[0].count > 0;
+    const [result] = await pool.execute(query, [newRole, taskId, userId]);
+    return result.affectedRows > 0;
   }
 
   /**
-   * Obtener estadísticas de asignaciones
-   * @returns {Promise<Object>} - Estadísticas de asignaciones
+   * Sincronizar asignaciones de una tarea
+   * Elimina las que no están en la lista y agrega las nuevas
+   * @param {number} taskId - ID de la tarea
+   * @param {Array} userIds - Lista de IDs de usuarios
+   * @param {number} assignedBy - ID del usuario que asigna
+   * @returns {Promise<Object>} Resultado de la sincronización
    */
-  async getAssignmentStatistics() {
-    const query = `
-      SELECT 
-        COUNT(*) as total_assignments,
-        COUNT(DISTINCT tarea_id) as tasks_with_assignments,
-        COUNT(DISTINCT usuario_id) as users_with_assignments,
-        AVG(assignments_per_task.count) as avg_assignments_per_task
-      FROM ${this.tableName}
-      LEFT JOIN (
-        SELECT tarea_id, COUNT(*) as count
-        FROM ${this.tableName}
-        GROUP BY tarea_id
-      ) assignments_per_task ON ${this.tableName}.tarea_id = assignments_per_task.tarea_id
-    `;
+  async syncAssignments(taskId, userIds, assignedBy) {
+    // Obtener asignaciones actuales
+    const currentAssignments = await this.getAssignmentsByTaskId(taskId);
+    const currentUserIds = currentAssignments.map(a => a.usuario_id);
     
-    const result = await this.raw(query);
-    return result[0];
+    // Determinar qué agregar y qué eliminar
+    const toAdd = userIds.filter(id => !currentUserIds.includes(id));
+    const toRemove = currentUserIds.filter(id => !userIds.includes(id));
+    
+    // Eliminar asignaciones que ya no están
+    for (const userId of toRemove) {
+      await this.deleteAssignment(taskId, userId);
+    }
+    
+    // Agregar nuevas asignaciones
+    const added = [];
+    for (const userId of toAdd) {
+      const assignment = await this.createAssignment({
+        tarea_id: taskId,
+        usuario_id: userId,
+        rol_asignacion: 'colaborador',
+        asignado_por: assignedBy
+      });
+      added.push(assignment);
+    }
+    
+    return {
+      added: added.length,
+      removed: toRemove.length,
+      total: userIds.length
+    };
   }
 }
 

@@ -665,6 +665,313 @@ class TaskController {
       });
     }
   }
+
+  /**
+   * Obtener asignaciones de una tarea
+   * GET /api/tasks/:id/assignments
+   * Permisos: Admin, Responsable del proyecto, o usuario asignado
+   */
+  async getTaskAssignments(req, res) {
+    try {
+      const taskId = parseInt(req.params.id);
+      const userId = req.user.id;
+      const isAdmin = req.user.es_administrador;
+
+      // Verificar permisos
+      if (!isAdmin) {
+        const canManage = await this.taskService.userCanManageTask(userId, taskId);
+        if (!canManage) {
+          return res.status(403).json({
+            success: false,
+            message: 'No tienes permisos para ver las asignaciones de esta tarea'
+          });
+        }
+      }
+
+      const assignments = await this.taskService.getTaskAssignments(taskId);
+
+      res.json({
+        success: true,
+        data: { assignments }
+      });
+
+    } catch (error) {
+      console.error('Error obteniendo asignaciones de tarea:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  /**
+   * Asignar usuario a tarea
+   * POST /api/tasks/:id/assignments
+   * Permisos: Admin o Responsable del proyecto
+   */
+  async assignUserToTask(req, res) {
+    try {
+      const taskId = parseInt(req.params.id);
+      const { usuario_id, rol_asignacion = 'colaborador' } = req.body;
+      const userId = req.user.id;
+      const isAdmin = req.user.es_administrador;
+      const ipAddress = req.ip || req.connection?.remoteAddress || null;
+
+      // Validar datos
+      if (!usuario_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'El ID del usuario es requerido'
+        });
+      }
+
+      // Verificar permisos
+      if (!isAdmin) {
+        const task = await this.taskService.getTaskById(taskId);
+        if (!task) {
+          return res.status(404).json({
+            success: false,
+            message: 'Tarea no encontrada'
+          });
+        }
+
+        const canManageProject = await this.taskService.userCanManageProject(userId, task.proyecto_id);
+        if (!canManageProject) {
+          return res.status(403).json({
+            success: false,
+            message: 'No tienes permisos para asignar usuarios a esta tarea'
+          });
+        }
+      }
+
+      const assignment = await this.taskService.assignUserToTask(taskId, usuario_id, {
+        rol_asignacion,
+        asignado_por: userId,
+        ipAddress
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Usuario asignado exitosamente',
+        data: { assignment }
+      });
+
+    } catch (error) {
+      console.error('Error asignando usuario a tarea:', error);
+      
+      if (error.message === 'Tarea no encontrada') {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      if (error.message === 'El usuario ya está asignado a esta tarea') {
+        return res.status(409).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  /**
+   * Desasignar usuario de tarea
+   * DELETE /api/tasks/:id/assignments/:userId
+   * Permisos: Admin o Responsable del proyecto
+   */
+  async unassignUserFromTask(req, res) {
+    try {
+      const taskId = parseInt(req.params.id);
+      const userIdToRemove = parseInt(req.params.userId);
+      const userId = req.user.id;
+      const isAdmin = req.user.es_administrador;
+      const ipAddress = req.ip || req.connection?.remoteAddress || null;
+
+      // Verificar permisos
+      if (!isAdmin) {
+        const task = await this.taskService.getTaskById(taskId);
+        if (!task) {
+          return res.status(404).json({
+            success: false,
+            message: 'Tarea no encontrada'
+          });
+        }
+
+        const canManageProject = await this.taskService.userCanManageProject(userId, task.proyecto_id);
+        if (!canManageProject) {
+          return res.status(403).json({
+            success: false,
+            message: 'No tienes permisos para desasignar usuarios de esta tarea'
+          });
+        }
+      }
+
+      const removed = await this.taskService.unassignUserFromTask(taskId, userIdToRemove, {
+        removedBy: userId,
+        ipAddress
+      });
+
+      if (!removed) {
+        return res.status(404).json({
+          success: false,
+          message: 'Asignación no encontrada'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Usuario desasignado exitosamente'
+      });
+
+    } catch (error) {
+      console.error('Error desasignando usuario de tarea:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  /**
+   * Sincronizar asignaciones de tarea
+   * PUT /api/tasks/:id/assignments
+   * Permisos: Admin o Responsable del proyecto
+   */
+  async syncTaskAssignments(req, res) {
+    try {
+      const taskId = parseInt(req.params.id);
+      const { usuario_ids = [] } = req.body;
+      const userId = req.user.id;
+      const isAdmin = req.user.es_administrador;
+      const ipAddress = req.ip || req.connection?.remoteAddress || null;
+
+      // Validar datos
+      if (!Array.isArray(usuario_ids)) {
+        return res.status(400).json({
+          success: false,
+          message: 'usuario_ids debe ser un array'
+        });
+      }
+
+      // Verificar permisos
+      if (!isAdmin) {
+        const task = await this.taskService.getTaskById(taskId);
+        if (!task) {
+          return res.status(404).json({
+            success: false,
+            message: 'Tarea no encontrada'
+          });
+        }
+
+        const canManageProject = await this.taskService.userCanManageProject(userId, task.proyecto_id);
+        if (!canManageProject) {
+          return res.status(403).json({
+            success: false,
+            message: 'No tienes permisos para modificar las asignaciones de esta tarea'
+          });
+        }
+      }
+
+      const result = await this.taskService.syncTaskAssignments(taskId, usuario_ids, {
+        assignedBy: userId,
+        ipAddress
+      });
+
+      res.json({
+        success: true,
+        message: 'Asignaciones sincronizadas exitosamente',
+        data: { result }
+      });
+
+    } catch (error) {
+      console.error('Error sincronizando asignaciones de tarea:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  /**
+   * Actualizar rol de asignación
+   * PATCH /api/tasks/:id/assignments/:userId
+   * Permisos: Admin o Responsable del proyecto
+   */
+  async updateAssignmentRole(req, res) {
+    try {
+      const taskId = parseInt(req.params.id);
+      const userIdToUpdate = parseInt(req.params.userId);
+      const { rol_asignacion } = req.body;
+      const userId = req.user.id;
+      const isAdmin = req.user.es_administrador;
+      const ipAddress = req.ip || req.connection?.remoteAddress || null;
+
+      // Validar datos
+      if (!rol_asignacion) {
+        return res.status(400).json({
+          success: false,
+          message: 'El rol de asignación es requerido'
+        });
+      }
+
+      const validRoles = ['responsable_principal', 'colaborador', 'revisor'];
+      if (!validRoles.includes(rol_asignacion)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Rol inválido. Valores permitidos: responsable_principal, colaborador, revisor'
+        });
+      }
+
+      // Verificar permisos
+      if (!isAdmin) {
+        const task = await this.taskService.getTaskById(taskId);
+        if (!task) {
+          return res.status(404).json({
+            success: false,
+            message: 'Tarea no encontrada'
+          });
+        }
+
+        const canManageProject = await this.taskService.userCanManageProject(userId, task.proyecto_id);
+        if (!canManageProject) {
+          return res.status(403).json({
+            success: false,
+            message: 'No tienes permisos para modificar las asignaciones de esta tarea'
+          });
+        }
+      }
+
+      const updated = await this.taskService.updateAssignmentRole(taskId, userIdToUpdate, rol_asignacion, {
+        updatedBy: userId,
+        ipAddress
+      });
+
+      if (!updated) {
+        return res.status(404).json({
+          success: false,
+          message: 'Asignación no encontrada'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Rol de asignación actualizado exitosamente'
+      });
+
+    } catch (error) {
+      console.error('Error actualizando rol de asignación:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
 }
 
 module.exports = TaskController;
