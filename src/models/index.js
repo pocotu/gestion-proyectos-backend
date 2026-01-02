@@ -4,6 +4,7 @@ const UserRoleModel = require('./userRoleModel');
 const ProjectModel = require('./projectModel');
 const ProjectResponsibleModel = require('./projectResponsibleModel');
 const TaskModel = require('./taskModel');
+const TaskAssignmentModel = require('./taskAssignmentModel');
 const FileModel = require('./fileModel');
 const LogActivityModel = require('./logActivityModel');
 const { pool } = require('../config/db');
@@ -30,6 +31,7 @@ async function createAllTables() {
       { name: 'proyectos', model: ProjectModel },
       { name: 'proyecto_responsables', model: ProjectResponsibleModel },
       { name: 'tareas', model: TaskModel },
+      { name: 'tarea_asignaciones', model: TaskAssignmentModel },
       { name: 'archivos_proyecto/tarea', model: FileModel },
       { name: 'logs_actividad', model: LogActivityModel }
     ];
@@ -119,6 +121,7 @@ module.exports = {
   ProjectModel,
   ProjectResponsibleModel,
   TaskModel,
+  TaskAssignmentModel,
   FileModel,
   LogActivityModel,
   createAllTables,
