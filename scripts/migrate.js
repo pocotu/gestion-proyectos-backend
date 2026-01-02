@@ -134,6 +134,7 @@ class MigrationManager {
         'logs_actividad',
         'archivos_proyecto',
         'archivos_tarea',
+        'tarea_asignaciones',
         'tareas',
         'proyecto_responsables',
         'proyectos',
