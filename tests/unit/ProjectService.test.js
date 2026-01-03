@@ -83,6 +83,18 @@ describe('ProjectService Unit Tests - getProjectDetails', () => {
         creator_email: 'test@example.com'
       });
       mockProjectRepository.isUserProjectResponsible.mockResolvedValue(false);
+      mockProjectRepository.getProjectResponsibles.mockResolvedValue([]);
+      mockProjectRepository.getProjectTasks.mockResolvedValue([]);
+      mockProjectRepository.getProjectFiles.mockResolvedValue([]);
+      mockProjectRepository.getProjectActivityLogs.mockResolvedValue([]);
+      mockProjectRepository.getProjectStatistics.mockResolvedValue({
+        totalTasks: 0,
+        tasksByStatus: { pendiente: 0, en_progreso: 0, completada: 0, cancelada: 0 },
+        tasksByPriority: { baja: 0, media: 0, alta: 0 },
+        totalFiles: 0,
+        totalResponsibles: 0
+      });
+      mockLogActivityRepository.logActivity.mockResolvedValue({});
       
       // Should not throw for valid string number when user is admin
       await expect(

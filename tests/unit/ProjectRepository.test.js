@@ -6,6 +6,7 @@
 const ProjectRepository = require('../../src/repositories/ProjectRepository');
 const DatabaseHelper = require('../utils/DatabaseHelper');
 const TestLogger = require('../utils/TestLogger');
+const { closePool } = require('../../src/config/db');
 
 describe('ProjectRepository Unit Tests - Detail View Methods', () => {
   let db;
@@ -60,6 +61,9 @@ describe('ProjectRepository Unit Tests - Detail View Methods', () => {
     }
     
     await db.close();
+    
+    // Cerrar el pool de conexiones del repositorio
+    await closePool();
   });
 
   describe('getProjectWithCreator', () => {

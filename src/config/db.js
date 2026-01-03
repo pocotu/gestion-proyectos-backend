@@ -53,4 +53,16 @@ function getPoolStatus() {
   };
 }
 
-module.exports = { pool, testConnection, getPoolStatus };
+// Función para cerrar el pool (útil para tests)
+async function closePool() {
+  try {
+    await pool.end();
+    console.log('✅ Database pool closed successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ Error closing database pool:', error.message);
+    return false;
+  }
+}
+
+module.exports = { pool, testConnection, getPoolStatus, closePool };
